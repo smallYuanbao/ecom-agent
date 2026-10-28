@@ -302,9 +302,64 @@ client/src/lib/
 
 **推荐：A**
 
-理由：Ch03 的状态机会在节点里频繁读写（每步写 trace_span），**同步调用会阻塞整个事件循环**；而且 K3 的事务边界用 ORM 表达更清楚。
+理由：Ch03 的状态机会在节点里频繁读写（每步写 `trace_span`），**同步调用会阻塞整个事件循环**；K3 的事务边界用 ORM 表达更清楚。
 
-**反方理由**：async SQLAlchemy 的 session 生命周期容易出错（比如在后台任务里复用 session）。
+### 参考实现的做法（对照）
+
+它也选了 A，但用 MySQL：
+
+```python
+engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+async_session = async_sessionmaker(engine, expire_on_commit=False)
+# DATABASE_URL = mysql+asyncmy://root:root@localhost:3306/mewhelp
+```
+
+**两个参数都不是随手写的**：
+
+| 参数 | 作用 | 不设会怎样 |
+|---|---|---|
+| `expire_on_commit=False` | commit 后对象属性仍可访问 | **async 下访问过期属性会触发隐式懒加载 → `MissingGreenlet`** |
+| `pool_pre_ping=True` | 取连接前探活 | MySQL 空闲连接被服务端掐断后，首个请求报 "server has gone away" |
+
+**session 用法**：每个 repository 函数自己开、自己提交，全仓库 52 处，**没有 `Depends(get_session)`**。
+
+```python
+async with db.async_session() as s:
+    s.add(msg); await s.commit()
+```
+
+### 三条借鉴（前两条照抄，第三条改进）
+
+| # | 做法 | 与参考实现的关系 |
+|---|---|---|
+| 1 | `expire_on_commit=False` | **照抄**——async 下不设会崩，不是优化 |
+| 2 | `pool_pre_ping=True` | **照抄**——对 SQLite 影响小，但将来换 PG/MySQL 必需 |
+| 3 | **session 可传入** | **改进**——它做不到跨表事务 |
+
+**第 3 条为什么必须改**：K3 要求"主表事务"，一次退费要同时写 `messages` 与 `conversations`。参考实现的"每函数自开自提交"会让这两步变成两个事务，中间失败就是"消息写了、状态没清"。
+
+```python
+async def append_message(..., *, session: AsyncSession | None = None):
+    if session is not None:
+        return await _append(session, ...)          # 复用外部事务
+    async with db.async_session() as s, s.begin():   # 单次调用自身也是事务
+        return await _append(s, ...)
+
+# 调用方（K3 主表事务）
+async with db.async_session() as s, s.begin():
+    await repo_message.append_message(..., session=s)
+    await repo_conversation.clear_flow(..., session=s)
+```
+
+### 与参考实现的另一处不同：数据库选择
+
+| | 参考实现 | 我们 |
+|---|---|---|
+| 数据库 | MySQL（asyncmy） | **SQLite（aiosqlite）** |
+| 启动 | 需要先起数据库容器 | 单文件，零运维（L5） |
+| 迁移成本 | — | SQLAlchemy 换库只改 URL |
+
+**反方理由**：async SQLAlchemy 的 session 生命周期容易出错（在后台任务里复用 session、跨 task 共享）；`expire_on_commit=False` 也意味着对象可能持有过期数据，需要时得手动 `refresh`。
 
 **影响章节**：Ch01、Ch03
 
