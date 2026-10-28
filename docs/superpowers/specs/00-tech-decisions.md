@@ -78,7 +78,7 @@ class ChromaRetriever: ...      # 现在
 
 **影响章节**：Ch02
 
-**你的选择**：______
+**你的选择**：___A___
 
 ---
 
@@ -100,7 +100,7 @@ ollama list | grep -i bge   # 有输出 → 选 A
 
 **影响章节**：Ch02
 
-**你的选择**：______
+**你的选择**：__A____
 
 ---
 
@@ -120,7 +120,7 @@ ollama list | grep -i bge   # 有输出 → 选 A
 
 **影响章节**：Ch02
 
-**你的选择**：______
+**你的选择**：___A___
 
 ---
 
@@ -128,15 +128,60 @@ ollama list | grep -i bge   # 有输出 → 选 A
 
 | 选项 | 做法 | 优点 | 缺点 |
 |---|---|---|---|
-| **A. openai 官方 SDK** | `OpenAI(base_url=...)` 兼容 DeepSeek 等 | 最薄一层；超时/重试自己控；生态稳定 | 需要自己写结构化输出解析 |
+| **A. openai 官方 SDK** | `OpenAI(base_url=...)` 兼容 DeepSeek 等 | 最薄一层；坑都在自己代码里，看得见 | 结构化输出要自己拼 |
 | B. httpx 手写 | 直接发 HTTP | 零 SDK 依赖 | 流式解析、重试、错误码全要自己处理 |
-| C. LangChain `ChatOpenAI` | 走 LangChain 抽象 | 与 LangGraph 生态一致 | 多一层抽象，出问题难定位 |
+| C. LangChain `ChatOpenAI` | 走 LangChain 抽象 | 与 LangGraph 生态天然兼容 | 多一层抽象，出问题难定位 |
 
 **推荐：A**
 
-理由：**LangGraph 只管编排，不强制用 LangChain 的模型层**。SDK 越薄，排障越直接（参考实现也踩过"抽象层里看不到真实请求"的坑）。
+理由：
 
-**反方理由**：如果 Ch03 大量用 LangChain 的 message/tool 类型，C 更省事。
+1. **LangGraph 只管编排，不强制用 LangChain 的模型层**
+2. **坑可见**：参考实现选了 C，仍然要子类化框架内部方法才能修 usage 统计（210 行包装）——**抽象不等于少踩坑，只是把坑换了个位置**
+3. 它踩出来的三条经验（见下）与平台无关，选 A 一样能照搬
+
+### 参考实现的做法（对照）
+
+它用 `langchain_openai.ChatOpenAI`，写了一个 210 行的 `llm.py`，做了四件事：
+
+| # | 问题 | 做法 |
+|---|---|---|
+| 1 | 流式 usage 被重复累加（24 chunk × 11 → 264） | 子类化 `_convert_chunk_to_generation_chunk`，把累计值换成增量 |
+| 2 | 结构化输出被模型多吐的思维链带崩 | `structured()` 强制走 `function_calling`，不用 `json_schema` |
+| 3 | 某些模型流式不吐 `tool_calls` | `needs_non_streaming_tools()` 强制非流式 |
+| 4 | 不同用途要不同模型/通道 | `resolve_slot(slot)` |
+
+**四条都是实测踩出来的**，注释里带具体数字。
+
+### 三条可照搬的经验（选 A 也适用）
+
+**① 结构化只用 function_calling**
+
+```python
+tools = [{"type": "function", "function": {"name": "emit", "parameters": schema}}]
+resp = client.chat.completions.create(
+    model=..., messages=..., tools=tools,
+    tool_choice={"type": "function", "function": {"name": "emit"}},
+)
+data = json.loads(resp.choices[0].message.tool_calls[0].function.arguments)
+```
+
+**② 偶发失败原地重试一次，不降级**
+
+```python
+for attempt in (1, 2):
+    try: return parse(call())
+    except (NoToolCall, JSONDecodeError): continue
+raise            # 两次都失败抛给调用点，由调用点降级成安全默认值
+```
+
+> 参考实现的原话：「别在这里降级到一条更差的通路上」。
+
+**③ 中转通道优先流式**
+
+非流式的中转层可能把 `tool_calls` 的 arguments 拼坏；流式反而正常。
+
+**反方理由**：若 Ch03 大量使用 LangChain 的 message / tool 类型，C 能省掉类型转换；且 LangGraph 与 LangChain 的 message 天然兼容。
 
 **影响章节**：Ch03、Ch06
 
