@@ -185,7 +185,7 @@ raise            # 两次都失败抛给调用点，由调用点降级成安全�
 
 **影响章节**：Ch03、Ch06
 
-**你的选择**：______
+**你的选择**：__A____
 
 ---
 
@@ -203,9 +203,65 @@ raise            # 两次都失败抛给调用点，由调用点降级成安全�
 
 **反方理由**：C 能更快出 demo；但进度面板、多轮状态、断流重连用原生写会很痛苦。
 
+### 请求层统一封装（配合 T6）
+
+**前端不直接调 axios / fetch，统一走两个文件**：
+
+| 文件 | 用途 | 技术 | 为什么分开 |
+|---|---|---|---|
+| `src/lib/http.ts` | JSON 接口（meta / health / 会话列表） | axios 实例 | 拦截器、错误映射统一 |
+| `src/lib/sse.ts` | 流式对话 `/api/chat` | **fetch + ReadableStream** | **axios 不支持流式响应**（会缓冲整段） |
+
+#### http.ts 统一做什么
+
+| 能力 | 说明 | 对应设计 |
+|---|---|---|
+| `baseURL` / `timeout` | 默认 10s（对话不走这里） | — |
+| 注入 `X-Trace-Id` | 前端生成，便于和 `core/logging.py` 的 trace_id 对齐 | L7 |
+| 统一错误映射 | 见下表 | D9 |
+| 响应解包 | 直接返回 `data`，调用方不写 `.data` | — |
+
+**错误映射表（对应 D9 四类错误码）**：
+
+| HTTP | 场景 | UI 行为 |
+|---|---|---|
+| 404 | 会话不存在 / 无权限 | 清空当前会话，回到新会话（不提示"无权限"，避免泄露） |
+| 429 | 触发限流（C3） | 提示「操作太频繁」，禁用发送 5 秒 |
+| 5xx / 超时 | 服务端异常 | 显示「稍后再试」+ 重试按钮，**保留用户输入不清空** |
+
+#### sse.ts 统一做什么
+
+| 能力 | 说明 | 对应设计 |
+|---|---|---|
+| POST `/api/chat` | 自动带 `client_message_id` | K4 |
+| 帧解析 | `data: {"delta":...}` / `{"event":"done"}` / interrupt | L1 |
+| `AbortController` | 用户点停止、离开页面时中止 | C1 |
+| 断流重连 | 记录 `last_offset`，重连先补历史再继续 | C2 |
+
+#### client_message_id 的生成规则（关键）
+
+```ts
+// 同一条用户消息的所有重试必须复用同一个 id
+const clientMessageId = crypto.randomUUID();
+await sendMessage({ text, clientMessageId });   // 重试时传同一个
+```
+
+**每次重试都新生成 = 幂等失效**——服务端会把它当成两条不同的消息。
+
+#### 目录与依赖
+
+```
+client/src/lib/
+  http.ts       # axios 实例 + 拦截器
+  sse.ts        # fetch 流式 + 重连
+  api.ts        # 业务接口（chat / sessions / meta），只调上面两个
+```
+
+**规则：组件里不允许出现 axios 或 fetch，只能调 `api.ts`。**
+
 **影响章节**：Ch08
 
-**你的选择**：______
+**你的选择**：__A____
 
 ---
 
