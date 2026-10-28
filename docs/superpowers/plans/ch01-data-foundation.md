@@ -38,7 +38,7 @@
 
 ```bash
 cd /Users/lidong/Desktop/workFile/ecom-agent
-uv add sqlalchemy aiosqlite
+uv add "sqlalchemy[asyncio]" aiosqlite    # 必须带 [asyncio]：否则缺 greenlet，import 即报错
 uv add --dev pytest pytest-asyncio
 ```
 
@@ -88,21 +88,28 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.config import get_settings
 
-engine = create_async_engine(
-    get_settings().database_url,
-    pool_pre_ping=True,          # T7：换 PG/MySQL 后必需；SQLite 下无害
-)
 
+def make_engine(url: str) -> AsyncEngine:      # 测试指向临时库也走这条路径
+    _ensure_sqlite_dir(url)                    # SQLite 不自建目录
+    eng = create_async_engine(url, pool_pre_ping=True)   # T7：换 PG/MySQL 后必需
+    _install_sqlite_pragmas(eng)
+    return eng
+
+
+def _install_sqlite_pragmas(engine: AsyncEngine) -> None:
+    @event.listens_for(engine.sync_engine, "connect")
+    def _set_pragmas(dbapi_conn, _record):
+        cur = dbapi_conn.cursor()
+        cur.execute("PRAGMA foreign_keys=ON")     # 不设：外键声明不生效
+        cur.execute("PRAGMA journal_mode=WAL")    # 不设：并发读写易 locked
+        cur.close()
+
+
+engine = make_engine(get_settings().database_url)
 async_session = async_sessionmaker(engine, expire_on_commit=False)  # T7：async 必设
-
-
-@event.listens_for(engine.sync_engine, "connect")
-def _sqlite_pragmas(dbapi_conn, _record):
-    cur = dbapi_conn.cursor()
-    cur.execute("PRAGMA foreign_keys=ON")     # 不设：外键声明不生效
-    cur.execute("PRAGMA journal_mode=WAL")    # 不设：并发读写易 locked
-    cur.close()
 ```
+
+**为什么抽出 `make_engine`**：PRAGMA 必须挂在真实建 engine 的路径上，测试用临时库时若另写一份 engine，就测不到真实的 PRAGMA 逻辑。
 
 **Step 2: 建库目录**
 
