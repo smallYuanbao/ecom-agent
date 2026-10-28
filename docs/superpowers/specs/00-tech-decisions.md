@@ -28,7 +28,7 @@
 
 **影响章节**：Ch03、Ch04
 
-**你的选择**：______
+**你的选择**：_A_____
 
 ---
 
@@ -45,6 +45,36 @@
 理由：语料只有几十到几百 chunk，**零运维比性能重要**；元数据过滤（按 `kb_version`、`source_type`）是现成能力。
 
 **反方理由**：如果最终想把 SQLite 做到"一个文件装下所有"，sqlite-vec 更干净。
+
+### 为什么不是 Milvus（及替换条件）
+
+Milvus 2.4+ **原生支持 sparse 向量 + hybrid search + 内置 RRF**，确实能省掉 T4 里的 rank_bm25 与手写融合。没列为选项的原因：
+
+| 理由 | 依据 |
+|---|---|
+| standalone 需要 etcd + MinIO + Milvus 三个容器 | 违背 **B3 零运维** |
+| 语料几十到几百 chunk，用不上分布式能力 | 规模不匹配 |
+| 原生 RRF 是黑盒，讲不清 k=60、归一化与融合的取舍 | **可解释性**（面试要讲） |
+
+**替换触发条件（满足任一，才评估迁移）**：
+
+| # | 触发条件 | 说明 |
+|---|---|---|
+| 1 | chunk 数 **> 10 万** | 应用层 BM25 + 融合开始有性能压力 |
+| 2 | 需要**多副本 / 分布式**检索 | Chroma 单机嵌入式不支持 |
+| 3 | 检索延迟成为瓶颈，且已确认卡在融合层 | 先做 profile，别猜 |
+
+**为将来留口**：检索层定义接口，Chroma 只是其中一个实现。
+
+```python
+class Retriever(Protocol):
+    async def search(self, query: str, *, top_k: int, filters: dict) -> list[Chunk]: ...
+
+class ChromaRetriever: ...      # 现在
+# class MilvusRetriever: ...    # 将来，业务代码不动
+```
+
+**注意**：若将来改用 Milvus 原生 hybrid，**T4（rank_bm25 + jieba）可整体删除**——这是两条互斥的路径。
 
 **影响章节**：Ch02
 
