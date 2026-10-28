@@ -14,10 +14,17 @@ PRAGMA 说明（SQLite 默认值对我们不利）：
   不设此开关则外键形同注释，能插进指向不存在会话的消息。
 - `journal_mode` 默认 `delete`：写事务期间锁全库，读写不能并发；WAL 可并发。
 """
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from sqlalchemy import event
-from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from app.config import get_settings
 
@@ -66,3 +73,19 @@ async def get_session():
     """FastAPI 依赖用；一次请求一个 session。业务层优先用 `session=` 参数传入（K3 跨表事务）。"""
     async with async_session() as session:
         yield session
+
+
+@asynccontextmanager
+async def session_scope(session: AsyncSession | None = None) -> AsyncIterator[AsyncSession]:
+    """repository 的统一入口：给了 session 就复用，没给就自开一个并托管事务。
+
+    - **传入 session**：事务归调用方，这里既不提交也不回滚（K3 跨表事务靠这个）
+    - **不传**：自开事务，正常退出 commit、异常 rollback
+
+    参考实现是"每个函数自开自提交"，做不到跨表事务；这里加 `session` 参数就是为了补这个洞。
+    """
+    if session is not None:
+        yield session
+        return
+    async with async_session() as s, s.begin():
+        yield s
