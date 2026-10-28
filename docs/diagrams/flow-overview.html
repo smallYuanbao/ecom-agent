@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>电商客服 Agent · 全流程</title>
+<style>
+  html,body{margin:0;padding:0;background:#fff;
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;}
+  #wrap{width:1720px;margin:0 auto;background:#fff;}
+  .lane{fill:#fdfdff;stroke:#e5e9f0;stroke-width:1;}
+  .lanehead{fill:#f4f6fa;stroke:#e5e9f0;stroke-width:1;}
+  .lt{font-size:15px;font-weight:700;fill:#1e293b;}
+  .h1{font-size:22px;font-weight:700;fill:#0f172a;letter-spacing:.5px;}
+
+  .b-blue{fill:#eff6ff;stroke:#2563eb;stroke-width:1.4;}
+  .b-purple{fill:#f6f3ff;stroke:#7c3aed;stroke-width:1.4;}
+  .b-green{fill:#effbf5;stroke:#059669;stroke-width:1.4;}
+  .b-gray{fill:#f8fafc;stroke:#94a3b8;stroke-width:1.2;}
+  .grp{fill:#faf9ff;stroke:#a78bfa;stroke-width:1;stroke-dasharray:5 4;}
+  .grp-green{fill:#f7fdf9;stroke:#6ee7b7;stroke-width:1;stroke-dasharray:5 4;}
+  .grp-orange{fill:#fffaf4;stroke:#fdba74;stroke-width:1;stroke-dasharray:5 4;}
+
+  .t{font-size:12.5px;font-weight:700;fill:#0f172a;}
+  .s{font-size:10.5px;font-weight:400;fill:#475569;}
+  .g{font-size:11.5px;font-weight:700;fill:#5b21b6;}
+  .go{font-size:11.5px;font-weight:700;fill:#c2410c;}
+  .gg{font-size:11.5px;font-weight:700;fill:#047857;}
+
+  .ln{fill:none;stroke-width:1.8;stroke-linejoin:round;}
+  .lb{stroke:#2563eb;}
+  .lp{stroke:#7c3aed;}
+  .lo{stroke:#ea580c;stroke-dasharray:6 4;}
+  .lg{stroke:#059669;stroke-dasharray:6 4;}
+  .lgr{stroke:#94a3b8;stroke-width:1.2;stroke-dasharray:3 3;}
+
+  .leg{font-size:11.5px;fill:#334155;}
+</style>
+</head>
+<body>
+<div id="wrap">
+<svg width="1720" height="1250" viewBox="0 0 1720 1250" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
+    <marker id="ap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker>
+    <marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ea580c"/></marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#059669"/></marker>
+  </defs>
+
+  <text class="h1" x="860" y="28" text-anchor="middle">电商客服 Agent · 全流程（确定性 Workflow + LLM 节点）</text>
+
+  <!-- ================= 泳道 ================= -->
+  <g>
+    <rect class="lane" x="24"  y="100" width="170" height="1060" rx="8"/>
+    <rect class="lane" x="194" y="100" width="300" height="1060" rx="8"/>
+    <rect class="lane" x="494" y="100" width="420" height="1060" rx="8"/>
+    <rect class="lane" x="914" y="100" width="560" height="1060" rx="8"/>
+    <rect class="lane" x="1474" y="100" width="222" height="1060" rx="8"/>
+
+    <rect class="lanehead" x="24"  y="44" width="170" height="44" rx="6"/>
+    <rect class="lanehead" x="194" y="44" width="300" height="44" rx="6"/>
+    <rect class="lanehead" x="494" y="44" width="420" height="44" rx="6"/>
+    <rect class="lanehead" x="914" y="44" width="560" height="44" rx="6"/>
+    <rect class="lanehead" x="1474" y="44" width="222" height="44" rx="6"/>
+
+    <text class="lt" x="109"  y="72" text-anchor="middle">用户</text>
+    <text class="lt" x="344"  y="72" text-anchor="middle">接入层 · FastAPI / SSE</text>
+    <text class="lt" x="704"  y="72" text-anchor="middle">主图 · 理解与路由（LangGraph）</text>
+    <text class="lt" x="1194" y="72" text-anchor="middle">五个出口（子图）</text>
+    <text class="lt" x="1585" y="72" text-anchor="middle">数据 · 观测 · 飞轮</text>
+  </g>
+
+  <!-- ================= 主路径 ================= -->
+  <rect class="b-blue" x="44"  y="150" width="130" height="70" rx="10"/>
+  <text class="t" x="109" y="180" text-anchor="middle">用户提问</text>
+  <text class="s" x="109" y="200" text-anchor="middle">一句话</text>
+
+  <rect class="b-blue" x="214" y="150" width="260" height="70" rx="10"/>
+  <text class="t" x="344" y="178" text-anchor="middle">接入与鉴权</text>
+  <text class="s" x="344" y="197" text-anchor="middle">trace_id · 会话归属(S2)</text>
+  <text class="s" x="344" y="211" text-anchor="middle">client_message_id 幂等(K4)</text>
+
+  <rect class="b-blue" x="514" y="150" width="180" height="70" rx="10"/>
+  <text class="t" x="604" y="178" text-anchor="middle">指代消解</text>
+  <text class="s" x="604" y="197" text-anchor="middle">resolved_query</text>
+  <text class="s" x="604" y="211" text-anchor="middle">Ch02 透传 · Ch05 真做</text>
+
+  <rect class="b-blue" x="714" y="150" width="180" height="70" rx="10"/>
+  <text class="t" x="804" y="178" text-anchor="middle">意图分类</text>
+  <text class="s" x="804" y="197" text-anchor="middle">12 类 · 一次 LLM</text>
+  <text class="s" x="804" y="211" text-anchor="middle">function_calling 结构化</text>
+
+  <rect class="b-blue" x="514" y="280" width="380" height="80" rx="10"/>
+  <text class="t" x="704" y="308" text-anchor="middle">按出口路由 route_by_intent</text>
+  <text class="s" x="704" y="327" text-anchor="middle">12 → 5 查表，无模型调用</text>
+  <text class="s" x="704" y="343" text-anchor="middle">「其他」为默认值 → fallback</text>
+
+  <!-- ================= A 知识出口 ================= -->
+  <rect class="grp" x="934" y="110" width="520" height="40" rx="8"/>
+  <text class="g" x="1194" y="135" text-anchor="middle">A · 知识出口 —— 政策问答 / 商品规格 / 优惠券 / 会员权益</text>
+
+  <rect class="b-purple" x="934"  y="160" width="160" height="70" rx="10"/>
+  <text class="t" x="1014" y="188" text-anchor="middle">混合检索</text>
+  <text class="s" x="1014" y="207" text-anchor="middle">dense + BM25</text>
+  <text class="s" x="1014" y="221" text-anchor="middle">RRF k=60 → top5</text>
+
+  <rect class="b-purple" x="1104" y="160" width="150" height="70" rx="10"/>
+  <text class="t" x="1179" y="188" text-anchor="middle">证据闸</text>
+  <text class="s" x="1179" y="207" text-anchor="middle">top1 ≥ 0.45</text>
+  <text class="s" x="1179" y="221" text-anchor="middle">fail-closed</text>
+
+  <rect class="b-purple" x="1264" y="160" width="190" height="70" rx="10"/>
+  <text class="t" x="1359" y="188" text-anchor="middle">生成 + 引用</text>
+  <text class="s" x="1359" y="207" text-anchor="middle">四区 prompt（前三区）</text>
+  <text class="s" x="1359" y="221" text-anchor="middle">[n] → citation_ids</text>
+
+  <!-- ================= B 数据出口 ================= -->
+  <rect class="grp" x="934" y="280" width="520" height="40" rx="8"/>
+  <text class="g" x="1194" y="305" text-anchor="middle">B · 数据出口 —— 订单查询 / 物流查询 / 库存价格</text>
+
+  <rect class="b-purple" x="934"  y="330" width="160" height="70" rx="10"/>
+  <text class="t" x="1014" y="358" text-anchor="middle">参数校验</text>
+  <text class="s" x="1014" y="377" text-anchor="middle">缺 order_id</text>
+  <text class="s" x="1014" y="391" text-anchor="middle">→ 追问，不猜</text>
+
+  <rect class="b-purple" x="1104" y="330" width="150" height="70" rx="10"/>
+  <text class="t" x="1179" y="358" text-anchor="middle">工具调用</text>
+  <text class="s" x="1179" y="377" text-anchor="middle">user_id 系统注入</text>
+  <text class="s" x="1179" y="391" text-anchor="middle">SQL 层过滤</text>
+
+  <rect class="b-purple" x="1264" y="330" width="190" height="70" rx="10"/>
+  <text class="t" x="1359" y="358" text-anchor="middle">结果校验</text>
+  <text class="s" x="1359" y="377" text-anchor="middle">空 / 越权 → NotFound</text>
+  <text class="s" x="1359" y="391" text-anchor="middle">同一异常，防枚举</text>
+
+  <!-- ================= C 规则出口 ================= -->
+  <rect class="grp" x="934" y="440" width="520" height="40" rx="8"/>
+  <text class="g" x="1194" y="465" text-anchor="middle">C · 规则出口 —— 退款申请 / 价保申请 / 订单变更</text>
+
+  <rect class="b-purple" x="934" y="490" width="520" height="150" rx="10"/>
+  <text class="t" x="1194" y="516" text-anchor="middle">8 状态确定性流水线</text>
+  <text class="s" x="1194" y="542" text-anchor="middle">intake → extract → validate → need_info →</text>
+  <text class="s" x="1194" y="560" text-anchor="middle">query_data → compute → compliance → respond</text>
+  <text class="s" x="1194" y="590" text-anchor="middle">金额由代码算，模型只复述　｜　合规硬闸，跳不过</text>
+  <text class="s" x="1194" y="612" text-anchor="middle">need_info 追问后可恢复（park + draft）</text>
+
+  <!-- ================= D 转人工 ================= -->
+  <rect class="grp" x="934" y="670" width="520" height="40" rx="8"/>
+  <text class="g" x="1194" y="695" text-anchor="middle">D · 转人工 —— 投诉 / 明确要求人工</text>
+
+  <rect class="b-purple" x="934" y="720" width="520" height="70" rx="10"/>
+  <text class="t" x="1194" y="748" text-anchor="middle">安抚话术 + create_ticket</text>
+  <text class="s" x="1194" y="767" text-anchor="middle">request_id 幂等，重试不重复建单</text>
+  <text class="s" x="1194" y="781" text-anchor="middle">actions: [{type: transfer_human}]</text>
+
+  <!-- ================= E 兜底 ================= -->
+  <rect class="grp-orange" x="934" y="820" width="520" height="40" rx="8"/>
+  <text class="go" x="1194" y="845" text-anchor="middle">E · 兜底 —— 闲聊 / 致谢 / 无法处理 / 「其他」</text>
+
+  <rect class="b-purple" x="934" y="870" width="520" height="70" rx="10"/>
+  <text class="t" x="1194" y="898" text-anchor="middle">三脚本 + 低置信话术（模板 + 变量，零模型）</text>
+  <text class="s" x="1194" y="917" text-anchor="middle">不假装知道：明确告知无依据，并给出下一步</text>
+  <text class="s" x="1194" y="931" text-anchor="middle">落 low_conf_questions（retrieved 三态）</text>
+
+  <!-- ================= SSE 回复 ================= -->
+  <rect class="b-blue" x="214" y="1080" width="260" height="70" rx="10"/>
+  <text class="t" x="344" y="1108" text-anchor="middle">SSE 流式回复</text>
+  <text class="s" x="344" y="1127" text-anchor="middle">ack → route → delta</text>
+  <text class="s" x="344" y="1141" text-anchor="middle">→ citations → actions → done</text>
+
+  <rect class="b-blue" x="44" y="1080" width="130" height="70" rx="10"/>
+  <text class="t" x="109" y="1110" text-anchor="middle">看到回答</text>
+  <text class="s" x="109" y="1130" text-anchor="middle">流式</text>
+
+  <!-- ================= L5 数据 · 观测 · 飞轮 ================= -->
+  <rect class="b-green" x="1494" y="330" width="182" height="70" rx="10"/>
+  <text class="t" x="1585" y="358" text-anchor="middle">SQLite · 10 表</text>
+  <text class="s" x="1585" y="377" text-anchor="middle">业务 4 + 系统 6</text>
+  <text class="s" x="1585" y="391" text-anchor="middle">会话/消息/草稿/trace</text>
+
+  <rect class="b-green" x="1494" y="440" width="182" height="70" rx="10"/>
+  <text class="t" x="1585" y="468" text-anchor="middle">Chroma + BM25 索引</text>
+  <text class="s" x="1585" y="487" text-anchor="middle">kb_version 内容哈希</text>
+  <text class="s" x="1585" y="501" text-anchor="middle">6 文档 + 5 法规</text>
+
+  <rect class="b-green" x="1494" y="550" width="182" height="70" rx="10"/>
+  <text class="t" x="1585" y="578" text-anchor="middle">trace_span</text>
+  <text class="s" x="1585" y="597" text-anchor="middle">每个节点/工具一行</text>
+  <text class="s" x="1585" y="611" text-anchor="middle">按 trace_id 还原调用树</text>
+
+  <rect class="grp-orange" x="1494" y="650" width="182" height="230" rx="10"/>
+  <text class="go" x="1585" y="672" text-anchor="middle">数据飞轮</text>
+
+  <rect class="b-green" x="1504" y="684" width="162" height="52" rx="8"/>
+  <text class="t" x="1585" y="707" text-anchor="middle">low_conf 池</text>
+  <text class="s" x="1585" y="725" text-anchor="middle">[] / [...] / NULL 三态</text>
+
+  <rect class="b-green" x="1504" y="748" width="162" height="52" rx="8"/>
+  <text class="t" x="1585" y="771" text-anchor="middle">人工审核</text>
+  <text class="s" x="1585" y="789" text-anchor="middle">驳回即终审</text>
+
+  <rect class="b-green" x="1504" y="812" width="162" height="52" rx="8"/>
+  <text class="t" x="1585" y="835" text-anchor="middle">写回知识库</text>
+  <text class="s" x="1585" y="853" text-anchor="middle">faq 表 → 重新入库</text>
+
+  <rect class="b-green" x="1494" y="920" width="182" height="70" rx="10"/>
+  <text class="t" x="1585" y="948" text-anchor="middle">评测 · EvalFlow</text>
+  <text class="s" x="1585" y="967" text-anchor="middle">40 条 · 7 桶</text>
+  <text class="s" x="1585" y="981" text-anchor="middle">金额手算对拍</text>
+
+  <!-- ================= 连线：主路径 ================= -->
+  <path class="ln lb" d="M174,185 H214"  marker-end="url(#ab)"/>
+  <path class="ln lb" d="M474,185 H514"  marker-end="url(#ab)"/>
+  <path class="ln lb" d="M694,185 H714"  marker-end="url(#ab)"/>
+  <path class="ln lb" d="M804,220 V280"  marker-end="url(#ab)"/>
+
+  <!-- 分流：路由 → 分配竖线 → 五出口 -->
+  <path class="ln lb" d="M894,320 H904"/>
+  <path class="ln lb" d="M904,195 V905"/>
+  <path class="ln lb" d="M904,195 H934" marker-end="url(#ab)"/>
+  <path class="ln lb" d="M904,365 H934" marker-end="url(#ab)"/>
+  <path class="ln lb" d="M904,565 H934" marker-end="url(#ab)"/>
+  <path class="ln lb" d="M904,755 H934" marker-end="url(#ab)"/>
+  <path class="ln lb" d="M904,905 H934" marker-end="url(#ab)"/>
+
+  <!-- A 出口内部 -->
+  <path class="ln lp" d="M1094,195 H1104" marker-end="url(#ap)"/>
+  <path class="ln lp" d="M1254,195 H1264" marker-end="url(#ap)"/>
+  <text class="s" x="1259" y="180" text-anchor="middle" style="fill:#7c3aed">强</text>
+
+  <!-- B 出口内部 -->
+  <path class="ln lp" d="M1094,365 H1104" marker-end="url(#ap)"/>
+  <path class="ln lp" d="M1254,365 H1264" marker-end="url(#ap)"/>
+
+  <!-- 证据弱 → 兜底（橙虚线） -->
+  <path class="ln lo" d="M1179,230 V255 H920 V925 H934" marker-end="url(#ao)"/>
+  <text class="go" x="1060" y="249" text-anchor="middle">证据弱 → 不硬答</text>
+
+  <!-- 兜底 → 低置信池 -->
+  <path class="ln lo" d="M1454,885 H1484 V690 H1494" marker-end="url(#ao)"/>
+  <text class="go" x="1420" y="878" text-anchor="middle" style="font-size:10.5px">落池</text>
+
+  <!-- 飞轮内部 -->
+  <path class="ln lg" d="M1585,736 V748" marker-end="url(#ag)"/>
+  <path class="ln lg" d="M1585,800 V812" marker-end="url(#ag)"/>
+  <path class="ln lg" d="M1666,838 H1686 V475 H1676" marker-end="url(#ag)"/>
+  <text class="gg" x="1670" y="430" text-anchor="end" style="font-size:10px">写回知识库</text>
+
+  <!-- 回流：五出口 → 竖向总线 → SSE -->
+  <path class="ln lb" d="M1454,195 H1462"/>
+  <path class="ln lb" d="M1454,365 H1462"/>
+  <path class="ln lb" d="M1454,565 H1462"/>
+  <path class="ln lb" d="M1454,755 H1462"/>
+  <path class="ln lb" d="M1454,905 H1462"/>
+  <path class="ln lb" d="M1462,195 V1115 H474" marker-end="url(#ab)"/>
+  <path class="ln lb" d="M214,1115 H174" marker-end="url(#ab)"/>
+
+  <!-- ================= 图例 ================= -->
+  <g transform="translate(40,1195)">
+    <path class="ln lb" d="M0,0 H44" marker-end="url(#ab)"/>
+    <text class="leg" x="52" y="4">主路径 / 请求</text>
+
+    <path class="ln lp" d="M180,0 H224" marker-end="url(#ap)"/>
+    <text class="leg" x="232" y="4">出口子图内部</text>
+
+    <path class="ln lo" d="M380,0 H424" marker-end="url(#ao)"/>
+    <text class="leg" x="432" y="4">证据弱 / 兜底 / 落池</text>
+
+    <path class="ln lg" d="M620,0 H664" marker-end="url(#ag)"/>
+    <text class="leg" x="672" y="4">飞轮写回</text>
+
+    <text class="leg" x="840" y="4" style="fill:#64748b">
+      注：B / C / D / E 出口在本图中简化为单框；C 出口内部是 8 状态确定性流水线，流程见 Ch03 spec。
+    </text>
+  </g>
+</svg>
+</div>
+</body>
+</html>

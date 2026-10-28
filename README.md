@@ -16,6 +16,22 @@ uv run uvicorn app.main:app --reload # :8000，看 /api/health
 
 本章不需要任何模型密钥（Ch01 零 LLM 调用）。
 
+## 进度
+
+| 章节 | 内容 | 状态 |
+|---|---|---|
+| Ch01 | 数据地基：10 表 / seed / 越权校验 | ✅ |
+| Ch02 | 主流程骨架：主图 + 意图 + 知识出口（其余占位） | ⏳ |
+| Ch03 | C 出口：8 状态流水线（金额计算） | ⏳ |
+| Ch04 | B 出口：订单 / 物流 / 库存查询 | ⏳ |
+| Ch05 | 多轮：窗口 / 摘要 / park | ⏳ |
+| Ch06 | 安全：注入防御 / 输出检查 | ⏳ |
+| Ch07 | 评测：EvalFlow 接入 | ⏳ |
+| Ch08 | 前端：聊天 + SSE | ⏳ |
+
+整体流程图见 [docs/diagrams/flow-overview.png](docs/diagrams/flow-overview.png)。
+简历措辞与实现状态的对照见 [docs/reports/resume-positioning.md](docs/reports/resume-positioning.md)。
+
 ## 架构
 
 ```
