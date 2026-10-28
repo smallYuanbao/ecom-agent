@@ -327,7 +327,7 @@ sqlite3 data/app.db "select user_id,count(*) from orders group by 1;"
 - [ ] `uv run pytest -q` 全绿
 - [ ] 手工验证越权：`get_order("2001", user_id="u1")` → NotFound
 - [ ] 检查 `schema.sql` 与 `models.py` 字段一致
-- [ ] 更新 `docs/plans/2026-10-28-tasks.md` 里 P1 的勾选
+- [ ] 更新 `docs/plans/tasks.md` 里 P1 的勾选
 - [ ] 提交
 
 **Commit:** `test: Ch01 验收（10 表 + seed + 越权）`
