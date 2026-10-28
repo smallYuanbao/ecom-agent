@@ -205,36 +205,63 @@ raise            # 两次都失败抛给调用点，由调用点降级成安全�
 
 ### 请求层统一封装（配合 T6）
 
-**前端不直接调 axios / fetch，统一走两个文件**：
+**分阶段建设，不提前抽象**：
 
-| 文件 | 用途 | 技术 | 为什么分开 |
+| 文件 | 用途 | 技术 | 何时建 |
 |---|---|---|---|
-| `src/lib/http.ts` | JSON 接口（meta / health / 会话列表） | axios 实例 | 拦截器、错误映射统一 |
-| `src/lib/sse.ts` | 流式对话 `/api/chat` | **fetch + ReadableStream** | **axios 不支持流式响应**（会缓冲整段） |
+| `lib/base.ts` | 基础请求：baseURL / headers / trace_id / 错误映射 | **fetch** | **现在** |
+| `lib/sse.ts` | 流式对话 `/api/chat` | fetch + ReadableStream | **现在** |
+| `lib/api.ts` | 业务接口，只调上面两个 | — | 现在 |
+| `lib/http.ts` | JSON 封装（可选 axios） | fetch 或 axios | **延后** |
 
-#### http.ts 统一做什么
+**为什么延后 `http.ts`**：
 
-| 能力 | 说明 | 对应设计 |
-|---|---|---|
-| `baseURL` / `timeout` | 默认 10s（对话不走这里） | — |
-| 注入 `X-Trace-Id` | 前端生成，便于和 `core/logging.py` 的 trace_id 对齐 | L7 |
-| 统一错误映射 | 见下表 | D9 |
-| 响应解包 | 直接返回 `data`，调用方不写 `.data` | — |
+目前只有 `/api/health` 与 `/api/meta` 两个 JSON 接口，且都是诊断用途，前端不消费。**建了就是没人用的抽象**——违反 R2（每个模块必须对应至少一条验收）。
 
-**错误映射表（对应 D9 四类错误码）**：
+**触发条件**：出现 2 个以上 JSON 业务接口时再抽。第一组预计是：
+
+```
+GET  /api/conversations              # 刷新后恢复会话列表
+GET  /api/conversations/{id}/messages # 拉历史消息
+POST /api/actions/transfer           # 转人工
+```
+
+**axios 不是必需**：3 个接口的规模用 fetch 足够。axios 的价值在拦截器链、并发队列、重试策略——这些场景现在都没有。
+
+#### base.ts：一份错误映射，JSON 与 SSE 共用
+
+```ts
+// lib/base.ts
+const BASE = import.meta.env.VITE_API_BASE ?? "";
+
+export class ApiError extends Error {
+  constructor(public status: number, public code: string, message: string) { super(message); }
+}
+
+export async function request(path: string, init: RequestInit = {}): Promise<Response> {
+  const res = await fetch(BASE + path, {
+    ...init,
+    headers: { "X-Trace-Id": newTraceId(), ...(init.headers ?? {}) },
+  });
+  if (!res.ok) throw mapError(res);
+  return res;
+}
+```
+
+**错误映射（对应 D9 四类错误码）**：
 
 | HTTP | 场景 | UI 行为 |
 |---|---|---|
-| 404 | 会话不存在 / 无权限 | 清空当前会话，回到新会话（不提示"无权限"，避免泄露） |
+| 404 | 会话不存在 / 无权限 | 清空当前会话回新会话（**不提示"无权限"**，避免泄露） |
 | 429 | 触发限流（C3） | 提示「操作太频繁」，禁用发送 5 秒 |
-| 5xx / 超时 | 服务端异常 | 显示「稍后再试」+ 重试按钮，**保留用户输入不清空** |
+| 5xx / 超时 | 服务端异常 | 「稍后再试」+ 重试按钮，**保留用户输入不清空** |
 
-#### sse.ts 统一做什么
+#### sse.ts：流式与重连
 
 | 能力 | 说明 | 对应设计 |
 |---|---|---|
 | POST `/api/chat` | 自动带 `client_message_id` | K4 |
-| 帧解析 | `data: {"delta":...}` / `{"event":"done"}` / interrupt | L1 |
+| 帧解析 | `delta` / `event` / `interrupt` | L1 |
 | `AbortController` | 用户点停止、离开页面时中止 | C1 |
 | 断流重连 | 记录 `last_offset`，重连先补历史再继续 | C2 |
 
@@ -246,15 +273,15 @@ const clientMessageId = crypto.randomUUID();
 await sendMessage({ text, clientMessageId });   // 重试时传同一个
 ```
 
-**每次重试都新生成 = 幂等失效**——服务端会把它当成两条不同的消息。
+**每次重试都新生成 = 幂等失效**——服务端会当成两条不同消息，K4 的唯一索引白建。
 
-#### 目录与依赖
+#### 目录与依赖规则
 
 ```
 client/src/lib/
-  http.ts       # axios 实例 + 拦截器
-  sse.ts        # fetch 流式 + 重连
-  api.ts        # 业务接口（chat / sessions / meta），只调上面两个
+  base.ts    # fetch 基础 + 错误映射 + trace_id
+  sse.ts     # 流式 + 重连
+  api.ts     # 业务接口（chat / 后续 sessions）
 ```
 
 **规则：组件里不允许出现 axios 或 fetch，只能调 `api.ts`。**
