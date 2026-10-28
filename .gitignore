@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# 配置与密钥
+.env
+.env.local
+*.key
+
+# 数据与产物
+*.db
+*.sqlite
+data/chroma/
+data/vectors/
+logs/
+.DS_Store
