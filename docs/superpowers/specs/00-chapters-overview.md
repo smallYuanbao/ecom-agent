@@ -3,7 +3,7 @@
 > 每章一个可独立验收的交付单元，格式沿用 `chNN-xxx-design.md`。
 > 设计依据：[docs/design/](../../design/) 十篇文档。
 > **先读**：[设计依据图谱](./00-design-basis-map.md)（依据 → 推导 → 落点的追溯矩阵）
-> **先定**：[技术选型 T1–T7](./00-tech-decisions.md)（未确认前，章节 spec 不写死技术）
+> **技术前提**：[技术选型 T1–T7](./00-tech-decisions.md) 已全部确认（均为 A）
 
 ---
 

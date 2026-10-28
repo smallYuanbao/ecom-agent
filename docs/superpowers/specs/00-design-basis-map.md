@@ -183,29 +183,38 @@
 | L6 配置校验 | `config.py` · Ch01 |
 | L7 三层可观测 | `core/logging.py` + `trace_span` · Ch01/Ch06 |
 | L8 文档演示 | README/录屏 · 收尾 |
+| T1 LangGraph | `graph/` · Ch03 |
+| T2 Chroma | `core/retrieval.py` · Ch02 |
+| T3 BGE-M3 本地 | `core/embedding.py` · Ch02 |
+| T4 rank_bm25 + jieba | `core/retrieval.py` · Ch02 |
+| T5 openai SDK | `core/llm.py` · Ch03 |
+| T6 React + Vite | `client/` · Ch08 |
+| T7 async SQLAlchemy | `db/session.py` · Ch01 |
 
 **检查**：67 条决策全部有落点，无悬空决策。
 
 ---
 
-## 五、未决项（推导过程中暴露出来的技术选型）
+## 五、技术选型（T1–T7 已定，均为 A）
 
-写这份图谱时发现，有几项**技术选型还没正式定**，但章节 spec 必然要用到：
+写这份图谱时暴露出七项**文档里没有、但章节 spec 必须用**的技术选型。已单独成篇并确认：
+[技术选型决策](./00-tech-decisions.md)。
 
-| # | 待定项 | 选项 | 影响 | 建议 |
-|---|---|---|---|---|
-| T1 | 状态机实现 | LangGraph / 自写状态机 | Ch03 整体结构 | **LangGraph**（D0 的子图、D5 的 checkpointer 都依赖它） |
-| T2 | 向量库 | Chroma / sqlite-vec / FAISS | Ch02 | **Chroma**（baby-ai 经验，零运维） |
-| T3 | Embedding | BGE-M3 本地（Ollama）/ API | Ch02 | 取决于本机是否有 Ollama；没有则用 API |
-| T4 | BM25 | rank_bm25 + jieba / 自己实现 | Ch02 | **rank_bm25 + jieba**（语料小，够用） |
-| T5 | LLM SDK | OpenAI 兼容 SDK | Ch03 | **openai** 官方 SDK，base_url 指向 DeepSeek |
-| T6 | 前端框架 | React + Vite | Ch08 | 用你最熟的（frontend 出身，无争议） |
-| T7 | 异步 SQL | aiosqlite + async SQLAlchemy | Ch01 | 已按此写骨架 |
+| # | 选型 | 选择 | 依据 |
+|---|---|---|---|
+| T1 | 状态机实现 | **LangGraph** | D0 子图、D5 checkpointer、D3 interrupt 都依赖它 |
+| T2 | 向量库 | **Chroma** | B3 零运维；语料几十到几百 chunk；Milvus 留替换条件 |
+| T3 | Embedding | **BGE-M3 本地（Ollama）** | 离线可跑、数据不出门 |
+| T4 | BM25 | **rank_bm25 + jieba** | 语料小，少写 100 行 |
+| T5 | LLM SDK | **openai 官方 SDK** | 抽象层越薄，坑越可见（参考实现 210 行补丁为证） |
+| T6 | 前端 | **React + Vite** | 你的强项；请求层 base/sse 现在、http 延后 |
+| T7 | 异步 SQL | **async SQLAlchemy + aiosqlite** | 不阻塞事件循环；session 可传入以支持 K3 事务 |
 
-**T1–T5 需要在写 Ch02/Ch03 spec 之前定**，否则 spec 里会写出"待定"。
+**从"未决"到"已定"的判断依据**：
 
-> 这七项已单独拆成 [技术选型决策](./00-tech-decisions.md)（T1–T7，格式与 D/M/C/S/K/L 一致）。
-> **在它确认之前，本节的 T1–T7 只是建议，不是依据。**
+- T1/T2/T4/T7 由**已有决策倒推**（D0/D5/B3/K3）
+- T3 由**本机环境**决定（有 Ollama 则本地）
+- T5/T6 由**可维护性**决定（坑可见 / 你的强项）
 
 ---
 

@@ -1,6 +1,6 @@
 # 技术选型决策（T1–T7）
 
-> 状态：**待确认**
+> 状态：**T1–T7 全部确认（2026-10-28），均为 A**
 > 说明：这七项**目前不是依据**——它们是写章节 spec 前必须定下来的前提。
 > 定完之后，请同步更新 [依据图谱](./00-design-basis-map.md) 的「五、未决项」。
 > 格式与 D / M / C / S / K / L 一致：选项 → 推荐 → 理由 → 反方 → 你的选择。
@@ -363,7 +363,7 @@ async with db.async_session() as s, s.begin():
 
 **影响章节**：Ch01、Ch03
 
-**你的选择**：______
+**你的选择**：___A___
 
 ---
 
@@ -378,10 +378,10 @@ async with db.async_session() as s, s.begin():
 
 | # | 决策 | 选择 |
 |---|---|---|
-| T1 | 状态机实现 | ______ |
-| T2 | 向量库 | ______ |
-| T3 | Embedding | ______ |
-| T4 | BM25 | ______ |
-| T5 | LLM SDK | ______ |
-| T6 | 前端 | ______ |
-| T7 | 异步 SQL | ______ |
+| T1 | 状态机实现 | **A · LangGraph** |
+| T2 | 向量库 | **A · Chroma**（Milvus 留替换触发条件） |
+| T3 | Embedding | **A · BGE-M3 本地（Ollama）** |
+| T4 | BM25 | **A · rank_bm25 + jieba** |
+| T5 | LLM SDK | **A · openai 官方 SDK**（function_calling 结构化） |
+| T6 | 前端 | **A · React + Vite**（base/sse 现在，http 延后） |
+| T7 | 异步 SQL | **A · async SQLAlchemy + aiosqlite**（session 可传入） |
