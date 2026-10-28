@@ -17,20 +17,20 @@
 
 ---
 
-## P1 · 数据层（1.5 天）
+## P1 · 数据层（1.5 天） · 对应 [Ch01](./ch01-data-foundation.md)
 
-| # | 任务 | 依据 | 产出 | 验收 |
-|---|---|---|---|---|
-| P1-1 | async engine + session 工厂 | — | `app/db/session.py` | 能建表、能连接 |
-| P1-2 | ORM models（6 张表） | M1/M4/K1/K4/K5 | `app/models.py` | 与 `schema.sql` 字段一致 |
-| P1-3 | 建表脚本执行 + 索引验证 | K4 | `scripts/init_db.py` | `EXPLAIN` 或唯一约束报错可见 |
-| P1-4 | conversations repository | M4 | `app/db/repo_conversation.py` | 能读写 `active_flow` 等三字段 |
-| P1-5 | messages repository | M1、C1 | `app/db/repo_message.py` | 支持 `status` 与 `client_message_id` |
-| P1-6 | orders/stock/coupons mock 源 | S1、数据设计 | `app/db/repo_order.py` | **`user_id` 必填**，越权返回 NotFound |
-| P1-7 | seed 脚本 | 数据设计 §四/§五 | `scripts/seed.py` | 6 SKU / 20 订单 / 5 券 |
-| P1-8 | P1 测试 | S1 | `tests/test_repo.py` | 越权、必填参数、幂等索引各 1 例 |
+| # | 任务 | 依据 | 产出 | 验收 | 状态 |
+|---|---|---|---|---|---|
+| P1-1 | async engine + session 工厂（含 PRAGMA） | T7 | `app/db/session.py` | 能建表、能连接；外键与 WAL 生效 | ✅ |
+| P1-2 | ORM models（**10 张表**：6 系统 + 4 业务） | M1/M4/K1/K4/K5/S1 | `app/db/models.py` | 与 `schema.sql` 字段一致 | ✅ |
+| P1-3 | 建表脚本 + 索引验证 | K4 | `scripts/init_db.py` | 建表幂等；schema.sql 与 ORM 自动比对通过 | ✅ |
+| P1-4 | conversations repository | M4 | `app/db/repo_conversation.py` | 能读写 `active_flow` 等三字段 | ✅ |
+| P1-5 | messages repository | M1、C1、K4 | `app/db/repo_message.py` | 支持 `status` 与 `client_message_id`，重复键返回首次 id | ✅ |
+| P1-6 | orders/stock/coupons 仓库（**落表，不 mock**） | S1、数据设计 | `app/db/repo_order.py` | **`user_id` 必填**，越权返回 NotFound | ✅ |
+| P1-7 | seed 脚本 | 数据设计 §四/§五 | `scripts/seed.py` | 6 SKU / 20 订单 / 5 券，重复执行不翻倍 | ✅ |
+| P1-8 | P1 测试 | S1 | `tests/test_models.py`、`test_repo_order.py`、`test_repo_message.py`、`test_seed.py` | 越权、必填参数、幂等索引、seed 覆盖度 | ✅ |
 
-**阶段验收**：`python scripts/init_db.py && python scripts/seed.py` 后，`get_order("1002", user_id="u2")` 抛 NotFound。
+**阶段验收**：`python scripts/init_db.py && python scripts/seed.py` 后，`get_order("2001", user_id="u1")` 抛 NotFound。✅ 已验证
 
 ---
 

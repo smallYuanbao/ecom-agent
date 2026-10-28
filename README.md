@@ -4,6 +4,18 @@
 
 > 设计阶段已完成，代码实现中。设计文档见 [docs/design/](docs/design/)。
 
+## 快速开始
+
+```bash
+uv sync
+uv run python scripts/init_db.py     # 建 10 张表（幂等，并校验 schema.sql 与 ORM 一致）
+uv run python scripts/seed.py        # 灌合成数据：6 SKU / 20 订单 / 5 券
+uv run pytest -q                     # 30 条测试
+uv run uvicorn app.main:app --reload # :8000，看 /api/health
+```
+
+本章不需要任何模型密钥（Ch01 零 LLM 调用）。
+
 ## 架构
 
 ```

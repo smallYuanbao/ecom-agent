@@ -332,12 +332,12 @@ sqlite3 data/app.db "select user_id,count(*) from orders group by 1;"
 
 ### Task 8: 验收与收尾
 
-- [ ] `uv run python scripts/init_db.py && uv run python scripts/seed.py`
-- [ ] `uv run pytest -q` 全绿
-- [ ] 手工验证越权：`get_order("2001", user_id="u1")` → NotFound
-- [ ] 检查 `schema.sql` 与 `models.py` 字段一致
-- [ ] 更新 `docs/superpowers/plans/00-tasks.md` 里 P1 的勾选
-- [ ] 提交
+- [x] `uv run python scripts/init_db.py && uv run python scripts/seed.py`（从零建库验证通过）
+- [x] `uv run pytest -q` 全绿（30 passed）
+- [x] 手工验证越权：`get_order("2001", user_id="u1")` → NotFound；漏传 → TypeError
+- [x] `schema.sql` 与 `models.py` 一致（`init_db.py` 自动比对，表/列/索引三项）
+- [x] 更新 `docs/superpowers/plans/00-tasks.md` 里 P1 的勾选
+- [x] 提交
 
 **Commit:** `test: Ch01 验收（10 表 + seed + 越权）`
 
