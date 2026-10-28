@@ -74,21 +74,112 @@ data/
 
 ```python
 class ConversationState(TypedDict, total=False):
-    trace_id: str
-    conversation_id: int | None
-    raw_query: str
-    resolved_query: str        # 本章 = raw_query（透传）
-    intent: str                # 12 类之一或"其他"
-    intent_confidence: float
-    route: str                 # knowledge / data / rules / human / fallback
-    evidence: list[dict]       # 检索命中的 chunk（本章允许全量，Ch05 收窄）
-    citation_ids: list[str]    # 如 ["第六条", "returns#退款时效"]
-    answer: str
-    actions: list[dict]        # transfer_human 等
-    is_placeholder: bool       # 占位标记，便于统计与测试
+    """一轮对话的全部状态。
+
+    total=False → 每个字段都可选：节点只返回自己改的键，LangGraph 增量合并，
+    不用把整个 state 传回来（详见下文「四个容易踩的点」①）。
+    """
+
+    # ── 输入：调用方（API 层）填，节点只读 ──────────────────────────
+    trace_id: str                 # 请求 id，串起日志与 trace_span(L7)；中间件生成
+    conversation_id: int | None   # 会话 id，同时是图的 thread_id(D5)；None = 新会话
+    raw_query: str                # 用户原话，永不改写；审计与回放看它
+
+    # ── 中间产物：节点依次写入 ────────────────────────────────────
+    resolved_query: str           # 补全后的完整问句；本章 = raw_query（透传，Ch05 真做）
+    intent: str                   # 12 类之一；分类失败/越界 = "其他"
+    intent_confidence: float      # 0–1；只做标记（<0.5 打 low_conf），不改路由
+    route: str                    # 5 出口之一：knowledge/data/rules/human/fallback
+    evidence: list[dict]          # 命中 chunk 原文 [{id,text,source,score}]；本章存全量
+    citation_ids: list[str]       # 最终引用了哪些 chunk，如 ["第六条","returns#退款时效"]
+
+    # ── 输出：给用户看 ──────────────────────────────────────────
+    answer: str                   # 回复正文；占位节点也必须写，不能留空
+    actions: list[dict]           # 前端要执行的动作，目前只有 {"type":"transfer_human"}
+    is_placeholder: bool          # True = 这条是"开发中"占位，不是真能力
 ```
 
-**注意**：`evidence` 在本章存全量（Ch01 的 D6 结论是 B+，但 A 出口的生成需要原文）。**Ch05 引入窗口后，evidence 只保留 citation_ids + 摘要。**
+### 字段释义
+
+按数据流分三组看，比按字母顺序看容易懂：**进来时带什么 → 中间算出来什么 → 出去时给什么**。
+
+**① 每轮输入（调用方填，节点只读）**
+
+| 字段 | 含义 | 谁写 | 为空时 |
+|---|---|---|---|
+| `trace_id` | 一次请求的 id，贯穿日志与 `trace_span`（L7） | 入口中间件 | 不可能为空；缺失则无法串起调用链 |
+| `conversation_id` | 会话 id，**同时是 LangGraph 的 `thread_id`**（D5）；null = 新会话 | API 层 | 本章允许 null（不落库），Ch05 起必须真实 |
+| `raw_query` | 用户这一轮的原话，**永不改写**——审计与回放看它 | API 层 | 必有；空字符串直接进兜底 |
+
+**② 中间产物（节点依次写入）**
+
+| 字段 | 含义 | 谁写 | 谁读 | 为空时 |
+|---|---|---|---|---|
+| `resolved_query` | 消解补全后的完整问句 | `resolve_reference` | `classify_intent`、知识检索 | 回落 `raw_query`（下游都写 `x or raw_query`） |
+| `intent` | 12 类之一；分类失败/越界为 **`"其他"`** | `classify_intent` | `route_by_intent` | 不在表里 → 路由走 `fallback` |
+| `intent_confidence` | 置信度 0–1，**只做标记不改路由** | `classify_intent` | trace / 低置信池 | 缺省当 0，不影响主流程 |
+| `route` | 落在 5 出口的哪个 | `classify_intent`（查同一张 `INTENT_TO_ROUTE`） | API 层发 `route` 帧、占位节点 | 缺省按 `fallback` 处理 |
+| `evidence` | 检索命中的 chunk 原文（含 `id/text/source/score`） | `knowledge` 子图的 retrieve | 证据闸、生成 | 空列表 = 零命中 → 走兜底 |
+| `citation_ids` | 最终引用了哪些 chunk 的 id | `knowledge` 子图的 generate | API 层发 `citations` 帧 | 解析不到就给 `[]`，**不报错** |
+
+**③ 每轮输出（给用户看的）**
+
+| 字段 | 含义 | 谁写 | 为空时 |
+|---|---|---|---|
+| `answer` | 回复正文。**占位节点也必须写它**，不能留空 | 出口节点 | API 层不发 `delta` 帧，用户看到空白 |
+| `actions` | 前端要执行的动作，目前只有 `{"type":"transfer_human"}` | D 出口 / 占位节点 | 不发 `actions` 帧（正常对话就是这样） |
+| `is_placeholder` | 这条回答是"开发中"的占位，不是真能力 | 占位节点 | 用 `state.get("is_placeholder", False)` 读，缺省即真实回答 |
+
+### 四个容易踩的点
+
+**① `total=False` 不是随便写的**
+
+它让每个字段都可选——节点只返回自己改的那几个键，LangGraph 做**增量合并**，不用把整个 state 传回去：
+
+```python
+async def classify_intent(state):
+    return {"intent": "政策问答", "intent_confidence": 0.92}   # 只返回改了的
+```
+
+若设成 `total=True`，每个节点都得返回全部 12 个字段，否则类型检查报错。
+
+**② `route` 与路由表：谁写、谁读**
+
+容易混的一点：**条件边函数不能写 state**。
+
+```python
+async def classify_intent(state):
+    intent, conf = await classify(state["resolved_query"])
+    return {"intent": intent, "intent_confidence": conf,
+            "route": INTENT_TO_ROUTE.get(intent, "fallback")}   # ← 写 state，供 SSE 帧
+
+def route_by_intent(state) -> str:                              # ← 纯函数，只返回键
+    return INTENT_TO_ROUTE.get(state.get("intent", ""), "fallback")
+```
+
+两处都查**同一张表**，所以 state 里的 `route` 和图实际走的分支一定一致（参考实现管这叫「单一来源不漂移」）。
+
+**③ 没有 reducer 的字段 = 后写覆盖前写**
+
+`add_messages` 那种"追加"行为需要 `Annotated[list, reducer]`。本章所有字段都是**覆盖语义**，所以 `answer`、`intent` 都是最后一次写入生效。
+
+**④ `is_placeholder` 为什么单独设一个字段**
+
+三个用途，缺了它就只能靠猜文案：
+
+| 用途 | 具体 |
+|---|---|
+| 测试断言 | 「规则类问题走占位」= `assert state["is_placeholder"] is True` |
+| 统计 | 上线前扫日志，数还有多少请求落在占位上 |
+| 前端 | Ch08 可以用它把答案渲染成灰条 + 「功能开发中」角标 |
+
+### `evidence` 的临时妥协
+
+本章 `evidence` 存**全量原文**，与 Ch01 定下的 D6 = **B+**（只存 `citation_ids` + 摘要）冲突。
+
+原因：A 出口生成时必须看到 chunk 原文，本章还没有别的取原文通道。
+
+**Ch05 引入消息窗口后改回 B+**——`evidence` 只留 `citation_ids` + 摘要，原文按 id 回查向量库。这条已记入「关键决策记录」。
 
 ## 路由表（12 意图 → 5 出口）
 

@@ -83,6 +83,7 @@ for name in ("knowledge", "data", "rules", "human", "fallback"):
 **Files:**
 - Create: `app/core/llm.py`（openai SDK 封装）
 - Create: `app/core/prompts.py`（意图 prompt）
+- Create: `app/graph/routing.py`（**本章只放 `INTENT_TO_ROUTE` 表**，Task 3 再补函数）
 - Modify: `app/graph/nodes.py`（`classify_intent`）
 - Test: `tests/test_intent.py`
 
@@ -92,8 +93,13 @@ for name in ("knowledge", "data", "rules", "human", "fallback"):
 INTENTS = ("政策问答","商品规格","优惠券活动","会员权益","订单查询","物流查询",
            "库存价格","退款申请","价保申请","订单变更","投诉","闲聊")
 
+INTENT_TO_ROUTE: dict[str, str]                       # 12 → 5，Task 3 的条件边也读它
+
 async def classify(query: str) -> tuple[str, float]   # (intent, confidence)
 ```
+
+**为什么表放在 Task 2**：`classify_intent` 要把 `route` 写进 state（SSE 的 `route` 帧要用），
+它得查这张表。任务顺序按依赖排，不按"表属于路由"这种直觉排。
 
 **Step 1: LLM 封装（function_calling 结构化）**
 
@@ -116,6 +122,8 @@ def structured_call(schema: dict, messages: list[dict]) -> dict:
 - prompt 里列出 12 类 + 边界规则（意图文档 §四的四对易混）
 - 解析失败 / 越界 → `("其他", 0.0)`
 - 置信度 < 0.5 → 仍按分类走，但 trace 标记 `low_conf`
+- 节点返回 `{"intent", "intent_confidence", "route"}`——`route` 由 `INTENT_TO_ROUTE` 查表得到
+  （条件边不能写 state，所以 state 里的 `route` 必须在这里写）
 
 **Step 3: 测试（12 例）**
 
@@ -130,21 +138,26 @@ def structured_call(schema: dict, messages: list[dict]) -> dict:
 ### Task 3: 路由与占位节点
 
 **Files:**
-- Create: `app/graph/routing.py`
+- Modify: `app/graph/routing.py`（补 `route_by_intent`；表在 Task 2 已建）
 - Modify: `app/graph/nodes.py`
 - Test: `tests/test_routing.py`
 
 **Interfaces:**
 
 ```python
-INTENT_TO_ROUTE: dict[str, str]   # 12 → 5
-def route_by_intent(state) -> str
+INTENT_TO_ROUTE: dict[str, str]   # 12 → 5（Task 2 已建）
+def route_by_intent(state) -> str # 纯函数：只返回键，不写 state
 async def placeholder(state) -> dict
 ```
 
-**Step 1: 路由表**
+**Step 1: 条件边函数**
 
-按 spec 的映射写死为常量；`其他` → `fallback`。
+```python
+def route_by_intent(state) -> str:
+    return INTENT_TO_ROUTE.get(state.get("intent", ""), "fallback")
+```
+
+用 `.get(默认值)` 而不是 `[]`：意图越界（模型返回没见过的词）时兜到 `fallback`，不抛 `KeyError`。
 
 **Step 2: 占位节点**
 
