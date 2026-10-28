@@ -180,9 +180,11 @@ async def main() -> None:
         await conn.run_sync(Base.metadata.create_all)
 ```
 
-**Step 2: 与 schema.sql 对齐检查**
+**Step 2: 与 schema.sql 对齐检查（自动，不靠人肉）**
 
-手工比对字段；`schema.sql` 是"可审阅的 DDL"，ORM 是"运行时真源"。**不一致时以 spec 为准，两边一起改。**
+`init_db.py` 建完表后，把 `schema.sql` 在内存库跑一遍，比对「表 / 列 / 索引」三项，不一致直接退出码 1。
+
+`schema.sql` 是"可审阅的 DDL"，ORM 是"运行时真源"。**不一致时以 spec 为准，两边一起改。**
 
 **验收**：
 
