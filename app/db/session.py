@@ -41,7 +41,7 @@ def _install_sqlite_pragmas(engine: AsyncEngine) -> None:
     """
 
     @event.listens_for(engine.sync_engine, "connect")
-    def _set_pragmas(dbapi_conn, _record) -> None:  # noqa: ANN001
+    def _set_pragmas(dbapi_conn, _record) -> None:
         cur = dbapi_conn.cursor()
         cur.execute("PRAGMA foreign_keys=ON")
         cur.execute("PRAGMA journal_mode=WAL")

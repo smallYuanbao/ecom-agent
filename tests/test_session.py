@@ -26,7 +26,7 @@ async def test_pragma_applies_to_every_new_connection(engine):
 
     这条测试防的是「只在启动时执行一次 PRAGMA」的写法。
     """
-    async with engine.connect() as first:
+    async with engine.connect():
         pass
     async with engine.connect() as second:
         assert (await second.exec_driver_sql("PRAGMA foreign_keys")).scalar() == 1

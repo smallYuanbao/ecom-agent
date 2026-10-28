@@ -2,10 +2,10 @@
 
 engine 仍走 `make_engine`，所以测试验证的是**真实的 PRAGMA 配置路径**。
 """
-import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.db import models  # noqa: F401  确保所有模型在建表前注册到 Base.metadata
 from app.db.base import Base
 from app.db.session import make_engine
 
