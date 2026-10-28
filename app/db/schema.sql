@@ -82,3 +82,50 @@ CREATE TABLE IF NOT EXISTS low_conf_questions (
   created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   reviewed_at       DATETIME
 );
+
+-- ============ 业务表（mock 数据落表，用于归属校验在 SQL 层完成）============
+
+CREATE TABLE IF NOT EXISTS orders (
+  id                TEXT PRIMARY KEY,               -- 订单号，如 1002
+  user_id           TEXT NOT NULL,                  -- 归属，S1
+  sku_id            TEXT NOT NULL,
+  spec              TEXT,
+  status            TEXT NOT NULL,                  -- 待付款/已付款/已发货/已签收/已关闭
+  amount            INTEGER NOT NULL,               -- 分
+  created_at        DATETIME NOT NULL,
+  paid_at           DATETIME,
+  shipped_at        DATETIME,
+  tracking_no       TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_order_user ON orders(user_id);
+
+CREATE TABLE IF NOT EXISTS logistics (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  tracking_no       TEXT NOT NULL,
+  order_id          TEXT NOT NULL REFERENCES orders(id),
+  latest_status     TEXT NOT NULL,
+  nodes             TEXT,                           -- JSON 数组
+  updated_at        DATETIME
+);
+CREATE INDEX IF NOT EXISTS idx_logistics_no ON logistics(tracking_no);
+
+CREATE TABLE IF NOT EXISTS stock (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  sku_id            TEXT NOT NULL,
+  spec              TEXT NOT NULL,
+  stock             INTEGER NOT NULL DEFAULT 0,
+  price             INTEGER NOT NULL,               -- 分
+  status            TEXT NOT NULL DEFAULT 'on_sale',-- on_sale / sold_out / presale
+  UNIQUE(sku_id, spec)
+);
+
+CREATE TABLE IF NOT EXISTS coupons (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id           TEXT NOT NULL,
+  code              TEXT NOT NULL,
+  threshold         INTEGER NOT NULL DEFAULT 0,     -- 满减门槛（分）
+  discount          INTEGER NOT NULL,               -- 优惠额（分）
+  expires_at        DATETIME NOT NULL,
+  used              INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_coupon_user ON coupons(user_id);
