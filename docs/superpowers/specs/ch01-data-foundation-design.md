@@ -50,7 +50,7 @@ data/app.db              # gitignore
 
 ## 数据模型（10 张表）
 
-### 系统表（6）
+### 关系
 
 ```
 conversations ──1:N──▶ messages
@@ -58,29 +58,223 @@ conversations ──1:N──▶ messages
       ├──1:N──▶ tickets
       └──1:N──▶ low_conf_questions
 
-trace_span        （独立，按 trace_id 索引）
-faq               （独立，飞轮写回目标）
+orders ──1:N──▶ logistics
+
+trace_span      （独立，按 trace_id 聚成调用树）
+faq             （独立，飞轮写回目标）
+stock / coupons （独立业务表）
 ```
 
-| 表 | 关键字段 | 说明 |
+### 通用约定
+
+| 约定 | 说明 |
+|---|---|
+| 时间 | 一律 `DATETIME`，应用层写 UTC |
+| JSON | SQLite 无原生 JSON 类型，以 `TEXT` 存序列化字符串 |
+| 金额 | 单位为**分**（整数），展示时除以 100 |
+| 软删 | 仅 `conversations` 有 `deleted_at`；`messages` 随会话隐藏，不单独删 |
+
+---
+
+### 1. conversations（会话）
+
+**用途**：一次对话的容器，同时是跨轮状态的锚点（LangGraph 的 `thread_id` 即 `id`）。
+
+| 字段 | 类型 | 约束 | 含义 | 依据 |
+|---|---|---|---|---|
+| `id` | INTEGER | PK 自增 | 会话 id，即图的 `thread_id` | D5 |
+| `user_id` | TEXT | NOT NULL | 所属用户；会话归属校验的依据 | S2 |
+| `created_at` | DATETIME | NOT NULL | 创建时间 | — |
+| `updated_at` | DATETIME | NOT NULL | 最后活动时间；乐观锁与超时清理用 | C4 / M7 |
+| `deleted_at` | DATETIME | NULL | 软删时间；非空即视为已删除 | K5 |
+| `summary` | TEXT | NULL | 早期对话的滚动摘要 | M2 |
+| `summary_upto_msg_id` | INTEGER | NULL | 摘要覆盖到哪条消息（`messages.id`），窗口起点 | M2 |
+| `active_flow` | TEXT | NULL | 进行中的流程：`refund` / `price_protection` / NULL | M4 |
+| `pending_question` | TEXT | NULL | 正在等用户补充什么：`order_id` / `confirm` / NULL | M4 |
+| `draft` | TEXT(JSON) | NULL | 已收集的要素，如 `{"reason":"尺寸不合适"}` | M4 |
+
+---
+
+### 2. messages（消息）
+
+**用途**：完整对话记录——回放、审计、窗口构建的数据源。
+
+| 字段 | 类型 | 约束 | 含义 | 依据 |
+|---|---|---|---|---|
+| `id` | INTEGER | PK 自增 | 消息 id；窗口/摘要锚点写作 `db-{id}` | M1 |
+| `conversation_id` | INTEGER | NOT NULL, FK→conversations.id | 所属会话 | M1 |
+| `role` | TEXT | NOT NULL | `user` / `assistant` / `tool` | M1 |
+| `content` | TEXT | NULL | 文本内容；`tool` 消息可为空 | M1 |
+| `tool_calls` | TEXT(JSON) | NULL | assistant 发起的工具调用数组 | 回放 |
+| `tool_call_id` | TEXT | NULL | `tool` 消息对应哪一次调用 | 回放 |
+| `status` | TEXT | NULL | 助手消息状态：`completed` / `cancelled` / `error` | C1 |
+| `client_message_id` | TEXT | NULL | 客户端生成的幂等键，同一条消息重试时复用 | K4 |
+| `meta` | TEXT(JSON) | NULL | 附注：`intent` / `route` / `citation_ids` | L1 |
+| `created_at` | DATETIME | NOT NULL | 写入时间 | M1 |
+
+**索引**
+
+| 名称 | 定义 | 用途 |
 |---|---|---|
-| conversations | id, user_id, deleted_at, summary, summary_upto_msg_id, **active_flow, pending_question, draft** | 后三个是 M4 的跨轮锚点 |
-| messages | id, conversation_id, role, content, tool_calls, tool_call_id, **status**, **client_message_id**, meta | status=C1 三态；client_message_id=K4 幂等 |
-| tickets | id, conversation_id, order_id, ticket_type, description, **request_id**, status | request_id 唯一，D11 |
-| trace_span | trace_id, span_id, parent_span_id, name, start_at, end_at, attrs | L7 span 模型 |
-| faq | id, question, answer, **source_type, source_question_id, reviewed_at, kb_version**, sync_status | K5 溯源 + K1 同步状态 |
-| low_conf_questions | id, conversation_id, question, normalized, source, reason, **retrieved**, status, merged_into, occurrence | retrieved 三态：`[...]` / `[]` / NULL |
+| `idx_msg_conv` | `(conversation_id, created_at)` | 按会话拉历史 |
+| `uk_msg_idem` | `(conversation_id, client_message_id)` **WHERE client_message_id IS NOT NULL** | 幂等去重 |
 
-### 业务表（4，mock 数据落表而非硬编码）
+**为什么用部分索引**：SQLite 里多个 `NULL` 不算冲突，但语义上"没有幂等键"本就不该被约束；加 `WHERE` 后只对真正带键的消息去重。
 
-| 表 | 关键字段 | 说明 |
-|---|---|---|
-| orders | id, **user_id**, status, amount, created_at, paid_at, shipped_at, tracking_no, sku_id, spec | 归属校验的载体 |
-| logistics | id, tracking_no, order_id, nodes(JSON), latest_status | 物流节点 |
-| stock | sku_id, spec, stock, price, status | 有货/无货/预售 |
-| coupons | id, **user_id**, code, threshold, discount, expires_at, used | 门槛与过期 |
+---
 
-**为什么落表而不是写 mock 函数**：归属校验要能在 SQL 层做（`WHERE user_id = ?`），写在函数里会退化成"遍历列表判断"，和 S1 的设计冲突。
+### 3. tickets（工单）
+
+**用途**：转人工时创建；一次请求只建一张（`request_id` 保证）。
+
+| 字段 | 类型 | 约束 | 含义 | 依据 |
+|---|---|---|---|---|
+| `id` | INTEGER | PK 自增 | 工单 id | — |
+| `conversation_id` | INTEGER | NOT NULL | 来自哪个会话 | D 出口 |
+| `order_id` | TEXT | NULL | 关联订单（可空，咨询类没有单号） | D 出口 |
+| `ticket_type` | TEXT | NULL | 投诉 / 退款 / 咨询 … | D 出口 |
+| `description` | TEXT | NULL | 用户原话或摘要 | D 出口 |
+| `request_id` | TEXT | **NOT NULL, UNIQUE** | 幂等键，重试不重复建单 | D11 |
+| `status` | TEXT | NOT NULL, 默认 `open` | open / processing / closed | — |
+| `created_at` | DATETIME | NOT NULL | 创建时间 | — |
+
+---
+
+### 4. trace_span（调用链）
+
+**用途**：一次请求内每个节点/工具的执行记录，用于排障与回放；结构对齐 OpenTelemetry 的 span 模型。
+
+| 字段 | 类型 | 约束 | 含义 | 依据 |
+|---|---|---|---|---|
+| `id` | INTEGER | PK 自增 | 行 id | — |
+| `trace_id` | TEXT | NOT NULL | 一次请求的 id，与日志里的 `trace_id` 一致 | L7 |
+| `span_id` | TEXT | NOT NULL | 单个节点/工具调用的 id | L7 |
+| `parent_span_id` | TEXT | NULL | 父 span，用于还原调用树 | L7 |
+| `name` | TEXT | NOT NULL | 如 `node:compute` / `tool:query_order` | L7 |
+| `start_at` | DATETIME | NOT NULL | 开始时间 | L7 |
+| `end_at` | DATETIME | NULL | 结束时间；NULL 表示仍在执行或异常中断 | C1 |
+| `attrs` | TEXT(JSON) | NULL | 附加信息：tokens / 结果摘要 / 错误码 | L7 |
+
+**索引**：`idx_span_trace(trace_id)`。
+
+---
+
+### 5. faq（飞轮写回的知识）
+
+**用途**：审核通过的低置信问题沉淀成的问答条目；写回后进入检索范围。
+
+| 字段 | 类型 | 约束 | 含义 | 依据 |
+|---|---|---|---|---|
+| `id` | INTEGER | PK 自增 | 条目 id | — |
+| `question` | TEXT | NOT NULL | 标准问题 | 飞轮 |
+| `answer` | TEXT | NOT NULL | 审核后的答案 | 飞轮 |
+| `source_type` | TEXT | NOT NULL | `flywheel`（飞轮写的）/ `manual`（手工录的） | K5 |
+| `source_question_id` | INTEGER | NULL | 来自哪条低置信问题（`low_conf_questions.id`） | K5 |
+| `reviewed_at` | DATETIME | NULL | 审核时间；NULL 表示未经人工确认 | K5 |
+| `kb_version` | TEXT | NULL | 写入时的知识库版本哈希 | K6 |
+| `sync_status` | TEXT | NOT NULL, 默认 `pending` | 向量库同步状态：`pending` / `synced` | K1 |
+| `created_at` | DATETIME | NOT NULL | 创建时间 | — |
+
+---
+
+### 6. low_conf_questions（低置信池）
+
+**用途**：飞轮的入口——记录"系统答不好"的问题与当时的证据。
+
+| 字段 | 类型 | 约束 | 含义 | 依据 |
+|---|---|---|---|---|
+| `id` | INTEGER | PK 自增 | 条目 id | — |
+| `conversation_id` | INTEGER | NULL | 来自哪个会话（回放用） | 飞轮 |
+| `question` | TEXT | NOT NULL | 用户原话 | 飞轮 |
+| `normalized` | TEXT | NULL | 归一化后的标准问题（合并同类用） | 飞轮 |
+| `source` | TEXT | NULL | 入口：`retrieval_low_conf` / `feedback` / `rule_conflict` | 意图 §七 |
+| `reason` | TEXT | NULL | 为什么判为低置信（分数、触发的守卫） | 意图 §七 |
+| `retrieved` | TEXT(JSON) | NULL | **三态**：`[...]` 有召回但分低 / `[]` 零命中 / NULL 没走检索 | 意图 §七 |
+| `status` | TEXT | NOT NULL, 默认 `pending` | pending / merged / approved / rejected / written_back | 飞轮 |
+| `merged_into` | INTEGER | NULL | 合并到哪一条（同义问题去重） | 飞轮 |
+| `occurrence` | INTEGER | NOT NULL, 默认 1 | 出现次数，合并时累加 | 飞轮 |
+| `kb_ref` | TEXT | NULL | 写回后的 FAQ 条目 id | K5 |
+| `created_at` | DATETIME | NOT NULL | 落池时间 | — |
+| `reviewed_at` | DATETIME | NULL | 审核时间；驳回即终审（不复活） | 飞轮 |
+
+**`retrieved` 三态的意义**：`[]` = 知识库真缺内容（优先补），`[...]` = 召回质量差（调阈值或改检索），`NULL` = 这条问题根本没走检索（不是知识缺口）。
+
+---
+
+### 7. orders（订单）
+
+**用途**：归属校验的载体；C 出口计算退费的输入。
+
+| 字段 | 类型 | 约束 | 含义 | 依据 |
+|---|---|---|---|---|
+| `id` | TEXT | PK | 订单号（如 `1002`），业务主键 | — |
+| `user_id` | TEXT | NOT NULL | 归属人；越权校验的核心字段 | S1 |
+| `sku_id` | TEXT | NOT NULL | 商品型号（如 `ST-60`） | 数据设计 §四 |
+| `spec` | TEXT | NULL | 规格（如 `标准装`） | 数据设计 §四 |
+| `status` | TEXT | NOT NULL | 待付款 / 已付款 / 已发货 / 已签收 / 已关闭 | 规则依赖 |
+| `amount` | INTEGER | NOT NULL | 实付金额（分） | 退费计算基数 |
+| `created_at` | DATETIME | NOT NULL | 下单时间；**价保**从这天起算 | 规则 §六 |
+| `paid_at` | DATETIME | NULL | 支付时间 | 规则 |
+| `shipped_at` | DATETIME | NULL | 发货时间；决定能否改地址/取消 | 规则 |
+| `tracking_no` | TEXT | NULL | 物流单号，关联 `logistics` | B 出口 |
+
+**索引**：`idx_order_user(user_id)`。
+
+---
+
+### 8. logistics（物流）
+
+**用途**：B 出口查询物流轨迹。
+
+| 字段 | 类型 | 约束 | 含义 |
+|---|---|---|---|
+| `id` | INTEGER | PK 自增 | 行 id |
+| `tracking_no` | TEXT | NOT NULL | 物流单号 |
+| `order_id` | TEXT | NOT NULL, FK→orders.id | 关联订单 |
+| `latest_status` | TEXT | NOT NULL | 最新状态（运输中 / 已签收 / 异常） |
+| `nodes` | TEXT(JSON) | NULL | 节点数组：`[{time, status, desc}]` |
+| `updated_at` | DATETIME | NULL | 最后更新时间 |
+
+**索引**：`idx_logistics_no(tracking_no)`。
+
+---
+
+### 9. stock（库存与价格）
+
+**用途**：B 出口答"有没有货""多少钱"。
+
+| 字段 | 类型 | 约束 | 含义 |
+|---|---|---|---|
+| `id` | INTEGER | PK 自增 | 行 id |
+| `sku_id` | TEXT | NOT NULL | 商品型号 |
+| `spec` | TEXT | NOT NULL | 规格 |
+| `stock` | INTEGER | NOT NULL, 默认 0 | 可售库存数量 |
+| `price` | INTEGER | NOT NULL | 当前售价（分） |
+| `status` | TEXT | NOT NULL, 默认 `on_sale` | on_sale / sold_out / presale |
+
+**唯一约束**：`UNIQUE(sku_id, spec)`——一个型号+规格只有一条库存记录。
+
+---
+
+### 10. coupons（优惠券）
+
+**用途**：A 出口回答券规则；规则判断门槛与过期。
+
+| 字段 | 类型 | 约束 | 含义 |
+|---|---|---|---|
+| `id` | INTEGER | PK 自增 | 行 id |
+| `user_id` | TEXT | NOT NULL | 持券人 |
+| `code` | TEXT | NOT NULL | 券码 |
+| `threshold` | INTEGER | NOT NULL, 默认 0 | 使用门槛（分），0 表示无门槛 |
+| `discount` | INTEGER | NOT NULL | 优惠金额（分） |
+| `expires_at` | DATETIME | NOT NULL | 过期时间 |
+| `used` | INTEGER | NOT NULL, 默认 0 | 0 未使用 / 1 已使用 |
+
+**索引**：`idx_coupon_user(user_id)`。
+
+---
+
+**为什么业务数据落表而不是写 mock 函数**：归属校验要能在 SQL 层做（`WHERE user_id = ?`），写在函数里会退化成"遍历列表判断"，和 S1 的设计冲突。
 
 ## 核心逻辑：越权校验下沉到数据层
 
