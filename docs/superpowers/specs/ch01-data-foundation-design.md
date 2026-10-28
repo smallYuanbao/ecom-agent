@@ -211,7 +211,7 @@ stock / coupons （独立业务表）
 | `user_id` | TEXT | NOT NULL | 归属人；越权校验的核心字段 | S1 |
 | `sku_id` | TEXT | NOT NULL | 商品型号（如 `ST-60`） | 数据设计 §四 |
 | `spec` | TEXT | NULL | 规格（如 `标准装`） | 数据设计 §四 |
-| `status` | TEXT | NOT NULL | 待付款 / 已付款 / 已发货 / 已签收 / 已关闭 | 规则依赖 |
+| `status` | TEXT | NOT NULL | 待付款 / 待发货 / 已发货 / 已签收 / 退款中 / 已关闭（6 种，见数据设计 §五） | 规则依赖 |
 | `amount` | INTEGER | NOT NULL | 实付金额（分） | 退费计算基数 |
 | `created_at` | DATETIME | NOT NULL | 下单时间；**价保**从这天起算 | 规则 §六 |
 | `paid_at` | DATETIME | NULL | 支付时间 | 规则 |
@@ -317,8 +317,8 @@ async def get_order(order_id: str, *, user_id: str) -> Order:
 | 2 | 外键 | 插入 `conversation_id=999` 的 message 抛 `IntegrityError`（需 `PRAGMA foreign_keys=ON`） |
 | 3 | 必填参数 | `get_order("1002")` 抛 `TypeError` |
 | 4 | 越权 | `get_order("1002", user_id="u2")` 抛 `NotFound` |
-| 5 | 幂等索引 | 同一 `(conversation_id, client_message_id)` 插两次，第二次冲突 |
-| 6 | seed 完整性 | 6/20/5 条；订单的 `user_id` 都能在 conversations 里找到 |
+| 5 | 幂等索引 | 同一 `(conversation_id, client_message_id)` 插两次：库里仍是 1 行（`append_message` 返回首次的 id） |
+| 6 | seed 完整性 | 6/20/5 条；6 种订单状态全覆盖；每人 3–5 单；订单号首位与归属一致（`1001`→`u1`）；至少 1 单超 7 天；券含已过期 / 已使用 / 未达门槛 |
 
 **手工验证**：
 
@@ -351,4 +351,9 @@ sqlite3 data/app.db "select user_id, count(*) from orders group by 1;"
 | 幂等索引 | 部分索引 `WHERE client_message_id IS NOT NULL` | 普通唯一索引：多条 `NULL` 在 SQLite 里视为不同，需部分索引才符合语义 |
 | 外键 | 连接时 `PRAGMA foreign_keys=ON` | 默认关闭：DDL 声明也不拦，必须显式开 + 反向测试验证 |
 | 表结构来源 | `schema.sql` 与 ORM 双写 | 只用 `create_all`：DDL 不可审阅；只用 SQL：ORM 类型对不上 |
+| 双写一致性 | `init_db.py` 自动比对表/列/索引 | 人工比对：会漏，且漏了没人发现 |
+| 幂等重复 | `append_message` **返回首次 id** | 抛唯一约束：客户端重试会变成 500，而重试不是错误 |
+| 幂等竞态 | 插入包 SAVEPOINT，冲突时只回滚这一步 | `session.rollback()`：会连累调用方的跨表事务（K3） |
+| `set_flow` 归属 | 不在本函数校验，由调用方先 `get_conversation` | 加 `user_id` 参数：与 `get_conversation` 重复，且容易误以为它可以独立使用 |
+| seed 覆盖检查 | 订单号首位 = 归属人（`1001`→`u1`） | "订单 user_id 能在 conversations 找到"：`conversations` 由运行时创建，seed 时为空，这条断言不成立 |
 | 时间字段 | `DATETIME` + 应用层写入 | SQLite 无原生时区类型：统一用 UTC 字符串 |

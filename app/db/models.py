@@ -178,7 +178,7 @@ class Order(Base):
     user_id: Mapped[str] = mapped_column(String, nullable=False)         # S1 归属人
     sku_id: Mapped[str] = mapped_column(String, nullable=False)
     spec: Mapped[str | None] = mapped_column(String)
-    status: Mapped[str] = mapped_column(String, nullable=False)          # 待付款/已付款/已发货/已签收/已关闭
+    status: Mapped[str] = mapped_column(String, nullable=False)          # 待付款/待发货/已发货/已签收/退款中/已关闭
     amount: Mapped[int] = mapped_column(Integer, nullable=False)         # 实付（分）
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)   # 价保起算
     paid_at: Mapped[datetime | None] = mapped_column(DateTime)

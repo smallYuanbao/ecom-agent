@@ -15,9 +15,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))  # 允许 `python scripts/init_db.py` 直接跑
 
-from app.db import models  # noqa: E402, F401  确保模型注册到 Base.metadata
-from app.db.base import Base  # noqa: E402
-from app.db.session import engine  # noqa: E402
+from app.db import models  # noqa: F401  确保模型注册到 Base.metadata
+from app.db.base import Base
+from app.db.session import engine
 
 SCHEMA_SQL = ROOT / "app" / "db" / "schema.sql"
 
