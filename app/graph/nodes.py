@@ -4,7 +4,13 @@
 节点名出现在 trace / 边 / 路由表 / SSE 帧里，是**跨章不变的契约**；
 函数体则在后续章节被整体替换（知识变子图、规则变 8 状态流水线）。
 """
-from app.graph.routing import FALLBACK_ROUTE, INTENT_TO_ROUTE
+from app.core.llm import LLMFormatError, structured_call
+from app.core.prompts import (
+    INTENT_PARAMETERS,
+    INTENT_TOOL_NAME,
+    intent_messages,
+)
+from app.graph.routing import DEFAULT_INTENT, FALLBACK_ROUTE, INTENT_TO_ROUTE
 from app.graph.state import ConversationState
 
 
@@ -17,16 +23,38 @@ async def resolve_reference(state: ConversationState) -> dict:
     return {"resolved_query": state.get("raw_query", "")}
 
 
-async def classify_intent(state: ConversationState) -> dict:
-    """意图分类：本章为占位，一律判「其他」→ 兜底出口。
+async def classify(query: str) -> tuple[str, float]:
+    """一次 LLM 调用判意图，返回 `(intent, confidence)`。
 
-    Task 2 换成真实 12 类分类（一次 LLM 调用，function_calling 结构化）。
-    保持"判不出来就兜底"的语义，占位期也不会假装分类成功。
+    **可恢复的错误一律降级成「其他」**（模型没按格式返回、意图越界）——
+    分类失败最多是这轮走兜底，不该让请求挂掉。
+    **不可恢复的错误直接上抛**（鉴权失败、超时、限流）——那是配置或服务问题，
+    吞掉会变成"所有问题都答不上来"的假象，反而更难排查。
     """
-    intent = "其他"
+    try:
+        data = await structured_call(
+            INTENT_TOOL_NAME, INTENT_PARAMETERS, intent_messages(query)
+        )
+    except LLMFormatError:
+        return DEFAULT_INTENT, 0.0
+
+    intent = str(data.get("intent", ""))
+    if intent not in INTENT_TO_ROUTE:          # 越界：模型返回了清单外的词
+        return DEFAULT_INTENT, 0.0
+    return intent, float(data.get("confidence", 0.0))
+
+
+async def classify_intent(state: ConversationState) -> dict:
+    """意图分类节点：读 `resolved_query`（空则回落原话），写 intent / 置信度 / route。
+
+    `route` 必须在这里写进 state——条件边函数没有写权限。它与 `route_by_intent`
+    查同一张 `INTENT_TO_ROUTE`，所以 state 里的 route 和图实际走的分支不会不一致。
+    """
+    query = state.get("resolved_query") or state.get("raw_query", "")
+    intent, confidence = await classify(query)
     return {
         "intent": intent,
-        "intent_confidence": 0.0,
+        "intent_confidence": confidence,
         "route": INTENT_TO_ROUTE.get(intent, FALLBACK_ROUTE),
     }
 

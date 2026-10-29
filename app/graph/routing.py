@@ -28,6 +28,12 @@ INTENT_TO_ROUTE: dict[str, str] = {
     "闲聊": "fallback",
 }
 
+# 有效意图 = 路由表的键（单一来源，不再单独维护一份清单）
+INTENTS: tuple[str, ...] = tuple(INTENT_TO_ROUTE)
+
+# 分类失败 / 越界 / 拿不准时的默认值。注意它不是意图，只是兜底槽位
+DEFAULT_INTENT = "其他"
+
 FALLBACK_ROUTE = "fallback"
 
 

@@ -526,4 +526,6 @@ async def run_turn(message: str, conversation_id: int | None, trace_id: str) -> 
 | LangGraph 版本 API 变化 | 动手前用 Context7 核实；先跑最小图验证 |
 | 意图 12 类边界不准 | 允许 ≥11/12；记录错误样本，Ch04 后统一调 |
 | 本地 Ollama 没装 | 检查 `ollama list`；没有则临时切 API（T3 已留双路） |
+| **LLM 客户端跨测试复用报 `Event loop is closed`** | `get_client()` 用了 `lru_cache`，而 pytest-asyncio 每个测试一个新事件循环。conftest 加自动夹具：测试结束 `close()` + `cache_clear()`（生产只有一个循环，缓存本身是对的） |
+| 模型返回清单外的意图词 | `classify()` 里做白名单校验，越界降级成「其他」；`route_by_intent` 再用 `.get(默认值)` 兜一层 |
 | 引用解析失败 | 生成时要求固定格式 `[n]`；解析不到就返回空 citations（不报错） |

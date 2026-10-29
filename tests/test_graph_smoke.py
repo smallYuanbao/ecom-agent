@@ -1,37 +1,67 @@
-"""主图冒烟测试：图能编译、能跑、五个出口都在且都是占位。
+"""主图冒烟测试：图能编译、能分流、五个出口都还是占位。
 
-本章五出口全占位，所以只验证"骨架立住了"，不验证业务正确性。
-真实分类与出口逻辑由 Task 2 / Task 7 等各自的测试覆盖。
+**故意不调模型**——这里要验证的是"接线对不对"，不是"分类准不准"。
+意图分类的准确率由 `tests/test_intent.py` 用真实模型覆盖。
 """
+import pytest
 
 from app.graph.build import EXIT_NODES, build_graph
+from app.graph.routing import INTENT_TO_ROUTE
+
+
+@pytest.fixture
+def force_intent(monkeypatch):
+    """把分类结果钉死，让测试离线且确定。"""
+
+    def _set(intent: str, confidence: float = 0.9) -> None:
+        async def fake(query: str) -> tuple[str, float]:
+            return intent, confidence
+
+        monkeypatch.setattr("app.graph.nodes.classify", fake)
+
+    return _set
 
 
 def test_graph_compiles():
-    graph = build_graph()
-    assert graph is not None
+    assert build_graph() is not None
 
 
-async def test_smoke_turn_reaches_an_exit():
-    """一句话走完图，必须落在某个出口，且带占位标记。"""
-    graph = build_graph()
-    result = await graph.ainvoke({"raw_query": "退货政策是什么"})
+async def test_smoke_turn_flows_through_graph(force_intent):
+    """一句话走完图：消解 → 分类 → 分流 → 出口。"""
+    force_intent("政策问答")
+    result = await build_graph().ainvoke({"raw_query": "退货政策是什么"})
 
-    assert result["resolved_query"] == "退货政策是什么"      # 本章透传
-    assert result["route"] in EXIT_NODES                    # 落在五个出口之一
-    assert result["is_placeholder"] is True                 # 五个出口都还是占位
-    assert result["answer"]                                # 占位也必须给话术，不能空
+    assert result["resolved_query"] == "退货政策是什么"    # 本章透传
+    assert result["intent"] == "政策问答"
+    assert result["route"] == "knowledge"
+    assert result["is_placeholder"] is True
+    assert result["answer"]                                # 占位也必须给话术
 
 
 async def test_all_five_exit_nodes_registered():
-    graph = build_graph()
-    nodes = set(graph.get_graph().nodes)
+    nodes = set(build_graph().get_graph().nodes)
     assert set(EXIT_NODES) <= nodes
 
 
-async def test_placeholder_answers_contain_no_amount():
+@pytest.mark.parametrize("intent", sorted(INTENT_TO_ROUTE))
+async def test_every_intent_lands_on_its_route(force_intent, intent):
+    """12 类意图逐个验证：state 里的 route 与图实际走的出口一致。"""
+    force_intent(intent)
+    result = await build_graph().ainvoke({"raw_query": "测试"})
+    assert result["route"] == INTENT_TO_ROUTE[intent]
+    assert result["is_placeholder"] is True
+
+
+async def test_unknown_intent_falls_back(force_intent):
+    """模型返回清单外的意图 → 兜底，不抛 KeyError。"""
+    force_intent("火星语")
+    result = await build_graph().ainvoke({"raw_query": "测试"})
+    assert result["route"] == "fallback"
+
+
+async def test_placeholder_answers_contain_no_amount(force_intent):
     """占位响应不得出现金额——避免用户把"开发中"当成真实报价。"""
-    graph = build_graph()
-    for query in ("我这单能退多少", "优惠券能抵多少钱", "退款要退多少"):
-        result = await graph.ainvoke({"raw_query": query})
-        assert "元" not in result["answer"], f"占位文案出现金额：{result['answer']}"
+    for intent in sorted(INTENT_TO_ROUTE):
+        force_intent(intent)
+        result = await build_graph().ainvoke({"raw_query": "这单能退多少"})
+        assert "元" not in result["answer"], f"{intent} 的占位文案出现金额"
