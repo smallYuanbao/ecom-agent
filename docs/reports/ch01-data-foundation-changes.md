@@ -31,7 +31,7 @@
 
 ### 修改与原因
 
-| 文件 · 位置 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
 |---|---|---|---|
 | `pyproject.toml` · dependencies | 只有 fastapi / uvicorn / pydantic-settings / sqlalchemy | 追加 `aiosqlite` | 没有异步驱动，`sqlite+aiosqlite://` 连不上 |
 | `pyproject.toml` · dev 组 | 只有 pytest / ruff | 追加 `pytest-asyncio` | `async def test_*` 需插件才能被收集，否则跳过 |
@@ -54,7 +54,7 @@
 
 ### 修改与原因
 
-| 文件 · 位置 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
 |---|---|---|---|
 | `pyproject.toml` · dependencies | `sqlalchemy` | `sqlalchemy[asyncio]` | 不带 extras 时缺 `greenlet`，`from sqlalchemy.ext.asyncio import …` 直接 `ImportError` |
 | `session.py` · engine 创建 | 计划里的做法：模块级 `create_async_engine(...)` 一把建完 | 抽出 `make_engine(url)` 工厂，模块级 `engine = make_engine(settings.url)` | PRAGMA 必须挂在**真实建 engine 的路径**上。测试要指向临时库，若另写一份 engine，就测不到真实的 PRAGMA 逻辑 |
@@ -76,7 +76,7 @@
 
 ### 修改与原因
 
-| 文件 · 位置 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
 |---|---|---|---|
 | `tests/conftest.py` · 顶部 import | 只 `from app.db.base import Base` | 增加 `import app.db.models` | 模型未 import 时 `Base.metadata` 是空的，`create_all` 建出 **0 张表**，测试全在空库上跑 |
 | `app/db/session.py` · `_set_pragmas` | 带 `# noqa: ANN001` | 去掉 | ruff 未启用 ANN 规则，`RUF100` 报"无用 noqa"；留着会掩盖真正需要的抑制 |
@@ -97,7 +97,7 @@
 
 ### 修改与原因
 
-| 文件 · 位置 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
 |---|---|---|---|
 | `.gitignore` · 数据段 | 只忽略 `*.db` | 追加 `*.db-wal` / `*.db-shm` | WAL 模式会生成两个伴生文件，`*.db` 匹配不到，会误提交进仓库 |
 | `scripts/init_db.py` · 对齐检查 | 计划 Task 4 Step 2：**人工比对** `schema.sql` 与 ORM 字段 | 建表后自动比对，不一致退出码 1 | 双写必然漂移。人工比对会漏，**漏了也没人发现**——等出错时已经晚了几周 |
@@ -121,7 +121,7 @@
 
 ### 修改与原因
 
-| 文件 · 位置 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
 |---|---|---|---|
 | `app/db/session.py` · 末尾 | 每个 repo 函数自己 `async with async_session() as s`，自开自提交（参考实现的做法） | 新增 `session_scope(session=None)`：给了就复用，没给才自开 | K3 要求"主表事务"——一次退费要同时写 `messages` 和 `conversations`。各函数自开 session 会让这两步变成**两个事务**，中间失败就是"消息写了、流程状态没清" |
 
@@ -142,7 +142,7 @@
 
 ### 修改与原因
 
-| 文件 · 位置 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
 |---|---|---|---|
 | `repo_message.py` · `append_message` 冲突处理 | 撞唯一索引后 `await s.rollback()`，再按幂等键查回 | `async with s.begin_nested()` 包住插入，冲突只回滚 SAVEPOINT | `session.rollback()` 回滚的是**整个事务**——调用方（K3）可能已在同一事务里写了别的表，全被一起撤销 |
 | `repo_message.py` · 重试语义 | 计划选项：抛唯一约束 | 返回首次写入的 id | 客户端重试不是错误，抛异常会让一次网络抖动变成 **500**；且破坏"同一 `client_message_id` 只用一次"的契约 |
@@ -164,7 +164,7 @@
 
 ### 修改与原因
 
-| 文件 · 位置 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
 |---|---|---|---|
 | `app/db/models.py`、`schema.sql` · `Order.status` 注释 | 5 种：待付款 / 已付款 / 已发货 / 已签收 / 已关闭 | 6 种：待付款 / **待发货** / 已发货 / 已签收 / **退款中** / 已关闭 | 与数据设计 §五 不符。少了"待发货"就分不清"已付款未发"与"已发货"——**改地址/取消的规则判断依赖这个区别**；少了"退款中"则 C 出口无法表达进行中的退款 |
 | `scripts/seed.py` · 幂等策略 | 计划选项：按主键 upsert | 先 `DELETE` 4 张业务表再插入（`conversations` / `messages` 不动） | upsert 删不掉"上一次 seed 有、这次没有"的旧行，数据集会逐渐腐化；而业务表是纯种子数据，清空安全 |
@@ -181,7 +181,7 @@
 
 ### 修改与原因
 
-| 文件 · 位置 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
 |---|---|---|---|
 | `README.md` · 新增「快速开始」 | 无运行说明，读者不知道要先建库再跑 | `uv sync` → `init_db` → `seed` → `pytest` → `uvicorn` | 少一步 `init_db` 就会报 `no such table`，看起来像代码坏了 |
 | `plans/00-tasks.md` · P1 表 | 写着"6 张表""mock 源""`tests/test_repo.py`" | 10 张表 / 落表 / 四个测试文件 | 任务表是后续执行的依据，与实现不符会误导下一步（尤其"mock 源"会让人以为不用建表） |

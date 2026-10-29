@@ -33,7 +33,7 @@
 
 ### 修改与原因
 
-| 文件 · 位置 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
 |---|---|---|---|
 | `pyproject.toml` · dependencies | 无编排框架 | 加 `langgraph`（实际解析到 1.2.18） | T1 定死 LangGraph；主图 + 条件边 + 后续子图都依赖它 |
 | `nodes.py` · `resolve_reference` 返回值 | plan 原稿：`{"resolved_query": ..., "trace": {"coref": "passthrough"}}` | 只返回 `{"resolved_query": ...}` | `ConversationState` 没有 `trace` 键。节点返回未声明的键，LangGraph 合并状态时会报错；节点级诊断信息应由 `trace_span` 落库（Task 9），不挤进图状态 |
