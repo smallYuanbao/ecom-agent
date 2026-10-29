@@ -47,7 +47,7 @@ docs/reports/
 | 章节 | 内容 | 记录文件 | 状态 |
 |---|---|---|---|
 | Ch01 | 数据地基（10 表 / seed / 越权） | [ch01-data-foundation-changes.md](./ch01-data-foundation-changes.md) | ✅ 8 节 |
-| Ch02 | 主流程骨架 | `ch02-walking-skeleton-changes.md` | ⏳ 待开始 |
+| Ch02 | 主流程骨架 | [ch02-walking-skeleton-changes.md](./ch02-walking-skeleton-changes.md) | 🚧 1 / 10 节 |
 | Ch03 | C 出口状态机 | `ch03-rule-exit-changes.md` | ⏳ |
 | Ch04 | B 出口 | `ch04-data-exit-changes.md` | ⏳ |
 | Ch05 | 多轮与上下文 | `ch05-multi-turn-changes.md` | ⏳ |
