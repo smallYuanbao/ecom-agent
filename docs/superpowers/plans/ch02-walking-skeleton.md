@@ -18,6 +18,7 @@
 - **技术选型定死**：T1 LangGraph、T2 Chroma、T3 BGE-M3 本地、T4 rank_bm25+jieba、T5 openai SDK。走不通停下问。
 - **占位三原则**：明确告知 / 统一节点 / 契约先定。**占位绝不返回金额。**
 - **本章不做 rerank、不做指代消解**（透传）、不做多轮窗口。
+- **本地环境（2026-10-29 实测）**：Chroma 1.0.0 跑在 Docker `:8000`（baby-ai 依赖，不动），Ollama `bge-m3` 1024 维可用。**本项目 FastAPI 用 8080**；Chroma 集合名 `ecom_kb` 且必须显式 `space=cosine`。详见 [本地环境现状](../../reports/local-env.md)。
 - 涉及 LangGraph API，动手前用 Context7 核实当前版本接口（**版本对不上是返工重灾区**）。
 - 不可单测的产出（prompt 质量）用"10 题评测 + 人工看 3 条"代替 TDD。
 - 每个 task 完成即 commit。
@@ -212,7 +213,16 @@ def kb_version() -> str                # 内容哈希，前 12 位
 
 **Step 3: 入库**
 
-Chroma collection `kb`，metadata 含 `source / kb_version`。
+```python
+collection = client.get_or_create_collection(
+    name="ecom_kb",
+    configuration={"hnsw": {"space": "cosine"}},   # 必须显式：默认 l2 会让证据闸语义反转
+)
+```
+
+metadata 含 `source / section / kb_version`。
+
+**集合名必须是 `ecom_kb`**：本地已有 `rag_docs` / `rag_medical` / `rag_samples` / `rag_user_uploads` / `user_profiles`，复用会维度不匹配或掺入无关数据。
 
 **Step 4: 版本哈希**
 
@@ -238,28 +248,41 @@ uv run python scripts/build_kb.py
 **Interfaces:**
 
 ```python
-async def search(query: str, *, top_k: int = 5) -> list[dict]   # [{id, text, source, score}]
+async def search(query: str, *, top_k: int = 5) -> list[dict]
+# [{id, text, source, section, rrf_score, similarity}]
+#   rrf_score  仅用于排序，别拿去比阈值（最大约 0.033）
+#   similarity = 1 - distance，证据闸读这个
 ```
 
 **Step 1: 两路**
 
 ```python
-dense = chroma.query(query, n=20)
-sparse = bm25_top(query, n=20)      # rank_bm25 + jieba 分词
+dense  = chroma.query(query, n=20)   # 返回 distance，须转 similarity
+sparse = bm25_top(query, n=20)       # rank_bm25 + jieba 分词
 ```
 
 **Step 2: RRF**
 
 ```python
-score = sum(1 / (60 + rank) for rank in ranks_of(chunk))
+rrf = sum(1 / (60 + rank) for rank in ranks_of(chunk))
 ```
 
-**Step 3: 测试**
+**Step 3: 距离转相似度**
+
+```python
+def to_similarity(distance: float) -> float:
+    return 1.0 - distance            # cosine distance = 1 - cosine similarity
+```
+
+**BM25 单独召回的 chunk 也要有 similarity**：按 chunk id 从集合里取回向量，现算一次 cosine（语料只有几十条，代价可忽略）。**不能让 similarity 为空**——否则闸对该 chunk 无法判定。
+
+**Step 4: 测试**
 
 - 同一 chunk 在两路都靠前 → 融合后仍靠前
 - 专有名词（如「7 天无理由」）能被 sparse 单独召回
+- **`to_similarity(0.2) == 0.8`**；`rrf_score` 的量级断言 < 0.05
 
-**验收**：2 条测试绿；`search("退货政策")` 前 5 命中 returns 文档。
+**验收**：3 条测试绿；`search("退货政策")` 前 5 命中 returns 文档。
 
 **Commit:** `feat(retrieval): dense+BM25+RRF 混合检索`
 
@@ -275,14 +298,20 @@ score = sum(1 / (60 + rank) for rank in ranks_of(chunk))
 **Interfaces:**
 
 ```python
-THRESHOLD = 0.45
+THRESHOLD = 0.45          # 余弦相似度下限，不是 RRF 分数
 def is_strong(hits: list[dict]) -> bool
 def fallback_text(topic: str, top1_title: str | None) -> tuple[str, str]   # (text, next_step)
 ```
 
 **Step 1: 闸**
 
-`hits[0]["score"] >= THRESHOLD`；空列表直接 False。
+```python
+def is_strong(hits: list[dict]) -> bool:
+    """空列表直接 False（fail-closed）。比较 similarity，不碰 rrf_score。"""
+    return bool(hits) and hits[0]["similarity"] >= THRESHOLD
+```
+
+**为什么不用 `score` 单一字段**：RRF 分数最大值约 `2/61 ≈ 0.033`，与 0.45 差一个数量级，混用会让闸永远不通过、知识出口全部走兜底。
 
 **Step 2: 兜底模板**
 

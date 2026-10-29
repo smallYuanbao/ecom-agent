@@ -21,6 +21,21 @@ class Settings(BaseSettings):
     chat_api_key: str = ""
     chat_base_url: str = ""
 
+    # 向量库：本地 Docker 中的 Chroma（见 docs/reports/local-env.md）
+    # 注意集合名必须独立，且建集合时显式 space=cosine（默认 l2 会让证据闸语义反转）
+    chroma_host: str = "localhost"
+    chroma_port: int = 8000
+    chroma_collection: str = "ecom_kb"
+
+    # Embedding：本地 Ollama，bge-m3 输出 1024 维
+    ollama_base_url: str = "http://localhost:11434"
+
+    # 检索参数：起步值，未校准。语料约 30 个 chunk，调参容易过拟合 10 题评测
+    dense_top_k: int = 20
+    sparse_top_k: int = 20
+    rrf_k: int = 60
+    evidence_threshold: float = 0.45   # 余弦相似度下限（similarity = 1 - distance）
+
     prompt_version: str = "v1"
     kb_version: str = ""          # 运行时由知识库内容哈希填充
 

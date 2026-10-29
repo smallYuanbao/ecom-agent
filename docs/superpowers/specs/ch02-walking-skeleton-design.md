@@ -208,16 +208,72 @@ dense top20（Chroma）+ BM25 top20（rank_bm25）→ RRF(k=60) → top5
 
 **不做 rerank**：语料几十到几百 chunk，先测 hit@3；低于 0.8 再考虑（触发条件记入后续优化）。
 
-**证据闸（单阈值起步）**：
+### 参数来源与状态（不要当校准值看）
+
+| 参数 | 值 | 来源 | 状态 |
+|---|---|---|---|
+| `dense_top_k` | 20 | 过取以保召回，融合阶段再收窄 | 起步值，未校准 |
+| `sparse_top_k` | 20 | 同上 | 起步值，未校准 |
+| `rrf_k` | 60 | RRF 原论文（Cormack 2009）常量，ES/Weaviate 默认亦为 60 | 通用值，不为本数据集调 |
+| `threshold` | 0.45 | BGE-M3 余弦相似度的常见区间 0.3–0.7 | **待校准** |
+
+**为什么不敏感**：语料约 30–35 个 chunk（6 篇文档按 `##` 切 + 5 条法规），**top20 ≈ 语料的 60%**，这个规模下 top_k 调大调小几乎不改变融合结果。RRF 又只吃排名不吃分数。**真正决定成败的是闸，不是这两个 20。**
+
+### 向量库连接：必须显式 cosine
+
+本地 Chroma 默认 `space=l2`（实测现有 5 个 collection 中 4 个是 l2）。**默认值会让证据闸的语义彻底反过来**——l2 返回的是欧氏距离，越小越相似。
 
 ```python
-THRESHOLD = 0.45            # top1 分数下限，常量可调
-
-def gate(hits) -> bool:
-    return bool(hits) and hits[0]["score"] >= THRESHOLD
+collection = client.get_or_create_collection(
+    name=settings.chroma_collection,                    # ecom_kb
+    configuration={"hnsw": {"space": "cosine"}},
+)
 ```
 
+**集合必须独立命名（`ecom_kb`）**：本地已有 `rag_docs` / `rag_medical` / `rag_samples` / `rag_user_uploads` / `user_profiles` 五个集合，混用会导致维度/空间不匹配或检索掺入无关数据。详见 [本地环境现状](../../reports/local-env.md)。
+
+### 距离 → 相似度（关键换算）
+
+Chroma 无论何种空间，`query()` 返回的都是 **`distance`**，不是相似度：
+
+```
+cosine distance = 1 - cosine similarity
+⇒ similarity = 1 - distance
+```
+
+**闸必须比较相似度**，直接比较 `distance` 会让"越不相关越容易通过"：
+
+```python
+def to_similarity(distance: float) -> float:
+    return 1.0 - distance
+```
+
+### 证据闸（单阈值起步）
+
+```python
+THRESHOLD = 0.45          # 余弦相似度下限（≈ distance ≤ 0.55）
+
+def gate(hits) -> bool:
+    # hits[0]["similarity"] 由 retrieval 层用 1 - distance 算好
+    return bool(hits) and hits[0]["similarity"] >= THRESHOLD
+```
+
+**排序用 RRF 分数，放行用余弦相似度——两者不混用。** 原因是 RRF 分数的量纲是 `1/(60+rank)`，最大值约 0.033，与 0.45 的阈值差一个数量级；混用会让闸永远不通过。
+
 **不通过** → 走兜底话术（模板 + 变量），并落 `low_conf_questions`。
+
+**检索结果契约**：
+
+```python
+{
+  "id": "returns#退款时效",
+  "text": "…",
+  "source": "returns.md",
+  "section": "退款时效",
+  "rrf_score": 0.0328,    # 内部排序用，不要拿去比阈值
+  "similarity": 0.61,     # 1 - distance，闸用这个
+}
+```
 
 ## 生成与引用
 
@@ -264,6 +320,14 @@ FALLBACK = "关于「{topic}」，我这边没有找到确切的依据，不能�
 
 补 `kb_version`（内容哈希），供 EvalFlow 做快照（K6）。
 
+### 端口分配（本地）
+
+| 服务 | 端口 | 说明 |
+|---|---|---|
+| **FastAPI（本项目）** | **8080** | 原计划 8000，与本地 Chroma 冲突 |
+| Chroma（Docker） | 8000 | 已运行，baby-ai 侧依赖，不动 |
+| Ollama | 11434 | bge-m3:latest（1024 维） |
+
 ## 测试与验证
 
 | # | 测试 | 断言 |
@@ -275,11 +339,14 @@ FALLBACK = "关于「{topic}」，我这边没有找到确切的依据，不能�
 | 5 | 兜底三脚本 | 闲聊/致谢/无法处理各命中对应话术 |
 | 6 | 转人工动作 | 投诉类响应含 `transfer_human` |
 | 7 | trace | 一次请求产生 ≥3 条 span，`trace_id` 一致 |
+| 8 | **集合空间是 cosine** | `collection.configuration.hnsw.space == "cosine"` |
+| 9 | **距离→相似度换算** | 构造 distance=0.2 → `similarity == 0.8`；闸用 similarity 判定 |
+| 10 | **RRF 分数不被当阈值用** | `rrf_score` 最大值 < 0.05；断言 gate 不读 `rrf_score` |
 
 **端到端验收（curl）**：
 
 ```bash
-curl -N -X POST localhost:8000/api/chat -H 'content-type: application/json' \
+curl -N -X POST localhost:8080/api/chat -H 'content-type: application/json' \
   -d '{"message":"退货政策是什么"}'
 # 期望：route=knowledge → delta → citations → done
 
@@ -310,5 +377,10 @@ curl -N ... -d '{"message":"我这单能退多少"}'
 | 检索融合 | **RRF(k=60)** | 线性加权：baby-ai 已验证 RRF 更稳（量纲问题） |
 | rerank | **本章不做** | 一开始就上：先测 hit@3，不达标再加 |
 | 证据闸 | **单阈值 0.45** | 四信号加权：无标注数据，先跑通再校准 |
+| 闸的输入 | **余弦相似度（1 - distance）** | 直接用 RRF 分数：量纲差一个数量级（RRF 最大约 0.033），闸永远不通过 |
+| 向量空间 | **显式 `space=cosine`** | 用 Chroma 默认 l2：距离越小越相似，闸的语义反转 |
+| 集合命名 | **`ecom_kb`，独立专用** | 复用 `rag_docs` 等：维度/空间不匹配，且检索掺入母婴数据 |
+| HTTP 端口 | **8080** | 用 8000：与本地常驻 Chroma 冲突，服务起不来 |
+| 检索参数 | **top20 / k=60 照抄通行值，标"未校准"** | 为 30 个 chunk 调参：必然过拟合 10 题评测 |
 | prompt 结构 | **先搭四区中的三区** | Ch06 才补工具结果区与输出校验 |
 | evidence 存储 | **本章存全量** | 与 D6 的 B+ 冲突：A 出口生成需要原文，Ch05 收窄为 citation_ids |

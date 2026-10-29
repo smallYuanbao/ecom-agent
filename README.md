@@ -11,7 +11,7 @@ uv sync
 uv run python scripts/init_db.py     # 建 10 张表（幂等，并校验 schema.sql 与 ORM 一致）
 uv run python scripts/seed.py        # 灌合成数据：6 SKU / 20 订单 / 5 券
 uv run pytest -q                     # 30 条测试
-uv run uvicorn app.main:app --reload # :8000，看 /api/health
+uv run uvicorn app.main:app --reload --port 8080   # :8080（8000 被本地 Chroma 占用）
 ```
 
 本章不需要任何模型密钥（Ch01 零 LLM 调用）。
