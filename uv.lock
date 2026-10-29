@@ -239,6 +239,7 @@ dependencies = [
     { name = "langgraph" },
     { name = "openai" },
     { name = "pydantic-settings" },
+    { name = "pyyaml" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -257,6 +258,7 @@ requires-dist = [
     { name = "langgraph", specifier = ">=1.2.18" },
     { name = "openai", specifier = ">=3.41.0" },
     { name = "pydantic-settings", specifier = ">=2.4" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
 ]
