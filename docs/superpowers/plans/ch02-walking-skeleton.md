@@ -96,11 +96,16 @@ for name in ("knowledge", "data", "rules", "human", "fallback"):
 
 ```python
 async def resolve_reference(state):     # Ch05 换成真实指代消解
-    return {"resolved_query": state["raw_query"], "trace": {"coref": "passthrough"}}
+    return {"resolved_query": state.get("raw_query", "")}
 
 async def classify_intent(state):       # Task 2 换成真实 12 类分类
-    return {"intent": "其他", "intent_confidence": 0.0, "route": "fallback"}
+    intent = "其他"
+    return {"intent": intent, "intent_confidence": 0.0,
+            "route": INTENT_TO_ROUTE.get(intent, "fallback")}
 ```
+
+**不要往 state 里塞 `trace` 字段**：`ConversationState` 没有它，节点返回未声明的键会报错。
+节点级诊断信息走 `trace_span`（Task 9 落库），不挤在图状态里。
 
 **五个出口函数的占位形态**（`app/graph/nodes.py`）：
 
