@@ -37,11 +37,21 @@ INTENT_SYSTEM = f"""## 角色
 拿不准、或者这句话跟电商售后无关时，选「{DEFAULT_INTENT}」，**不要硬塞进某一类**。
 「{DEFAULT_INTENT}」是兜底槽位，选它不会丢脸，硬塞才会让下游走错出口。
 
+## 一句话里有多个诉求时
+例如「能退吗？顺便查下物流」——**选最主要的一个**（用户最后强调的、或更明确的那句），
+同时把 `multi_intent` 置为 **true**。
+
+不要因为"另一个诉求答不了"就改变选择；也不要试图一次回答两件事。
+拿不准哪个是最主要的，就把 `multi_intent` 置为 true 并适当降低 confidence。
+
 ## 置信度
-给出 0–1 的 confidence：
+给出 0–1 的 confidence，**只表示"对选中的这个意图有多确定"**：
 - 措辞明确、能对上上面的例子 → 0.85 以上
 - 能判断但有点含糊 → 0.5–0.85
 - 几乎靠猜 → 0.5 以下（同时考虑选「{DEFAULT_INTENT}」）
+
+**不要用 confidence 表达"这句话有两个诉求"**——那是 `multi_intent` 的职责。
+一句话里有两个明确诉求、你也能确定主诉求时，confidence 可以是 0.8 以上，`multi_intent` 为 true。
 
 ## 输出
 只通过工具返回结果，不要用自然语言解释。
@@ -54,9 +64,18 @@ INTENT_PARAMETERS: dict[str, Any] = {
     "type": "object",
     "properties": {
         "intent": {"type": "string", "enum": list(_ALLOWED_INTENTS)},
-        "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+        "confidence": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "description": "对『选中的这一个意图』的确定度，不表示句子有没有多个诉求",
+        },
+        "multi_intent": {
+            "type": "boolean",
+            "description": "这句话里是否还有别的诉求（下游据此决定要不要让用户二选一）",
+        },
     },
-    "required": ["intent", "confidence"],
+    "required": ["intent", "confidence", "multi_intent"],
 }
 
 

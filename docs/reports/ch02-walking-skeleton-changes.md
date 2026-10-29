@@ -94,3 +94,35 @@
 | `tests/test_intent.py` · 三条 mock 用例上方 | monkeypatch 的两条要点：**为什么不走网络**（调的是模块全局里的名字）、**为什么 patch 使用处而不是定义处**（`from ... import` 新建独立绑定）；以及自动还原的机制 |
 | `tests/test_intent.py` · `boom` / `weird` / `capture` | 说明各自模拟什么、`*_args` 下划线前缀表示"接收但故意不用" |
 | `tests/test_graph_smoke.py` · `force_intent` | 与 `test_intent` 同一套 mock 机制；说明 patch 的是使用处 |
+
+### 补记 · 多意图信号 `multi_intent`（Task 2 追加）
+
+**触发**：实测「我买的推车能推吗？我要查推车物流」判成 `物流查询`、confidence **0.80**。
+一句话两个诉求，模型只答一个却很有把握——**confidence 表达不了"歧义"这件事**。
+
+**结论**：按此前「不支持组合查询」的决策，最终方案是**让用户二选一（澄清反问）**；
+但澄清需要跨轮状态（`pending_question`），属 Ch05。本章只把**信号**产出来。
+
+#### 修改与原因
+
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+|---|---|---|---|
+| `prompts.py` · `INTENT_PARAMETERS` | 只有 `intent` / `confidence` | 增加 `multi_intent: boolean`（必填），并给 `confidence` 加 description："只表示对选中意图的确定度" | 把"多诉求"塞进 confidence 会与"系统拿不准"混为一谈。两个诉求都很明确时 confidence 本该高，压到 0.6 以下反而失真 |
+| `prompts.py` · `INTENT_SYSTEM` | 无多意图规则 | 新增「一句话里有多个诉求时选最主要的一个并置 `multi_intent=true`」 | 不加规则，模型只输出主意图，下游永远不知道漏掉了一个诉求 |
+| `nodes.py` · `classify()` | 返回 `(intent, confidence)` | 返回 `(intent, confidence, multi_intent)`；降级路径固定 `False` | 信号要能被上层取到；降级时不能凭空宣称多意图 |
+| `nodes.py` · `classify_intent` | 解包二元组 | 解包三元组，**丢弃** `multi_intent` | 本章单轮、无追问，写进 state 就是没有消费者的字段。契约先定，P5-11 再落 state |
+| `scripts/try.py` · `run_intent` | 解包二元组 | 解包三元组，`multi_intent=True` 时额外打印一行 | 不跟着改就报 `ValueError: too many values to unpack` |
+
+#### 为什么不是"降低 confidence"
+
+| 方案 | 问题 |
+|---|---|
+| 多意图时把 confidence 压到 0.6 以下 | 与"句子模糊"共用同一个信号，下游无法区分该**追问澄清**还是该**让用户二选一** |
+| **独立 `multi_intent` 字段（采用）** | 各管各的：`confidence` 管"拿不准"，`multi_intent` 管"没答全" |
+
+#### 验证
+- `uv run pytest -q` → **65 passed**（新增 2 条多意图用例；12 条单意图用例全部断言 `multi_intent=False`）
+- 手工：
+  - `我买的推车能推吗？我要查推车物流` → 物流查询 / 0.80 / **multi_intent=True**
+  - `订单 1001 能退吗，顺便看看 ST-20 有货没` → 退款申请 / 0.80 / **multi_intent=True**
+  - `退货政策是什么`、`我的快递到哪了` → 不出现多意图标记

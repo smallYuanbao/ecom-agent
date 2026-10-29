@@ -59,9 +59,28 @@ CASES: list[tuple[str, str]] = [
 @requires_api_key
 @pytest.mark.parametrize(("query", "expected"), CASES)
 async def test_intent_classification(query: str, expected: str):
-    intent, confidence = await classify(query)
+    intent, confidence, multi_intent = await classify(query)
     assert intent == expected, f"「{query}」判成 {intent}（期望 {expected}）"
     assert 0.0 <= confidence <= 1.0
+    assert multi_intent is False, f"「{query}」是单一诉求，不该标成多意图"
+
+
+@requires_api_key
+@pytest.mark.parametrize(
+    "query",
+    [
+        "订单 1001 能退吗，顺便看看 ST-20 有货没",
+        "我买的推车能退吗？我要查推车物流",
+    ],
+)
+async def test_multi_intent_is_flagged(query: str):
+    """一句话两个诉求 → multi_intent=True。
+
+    注意**不要求** confidence 低：主诉求明确时它可以是高的。
+    两者表达的是不同的事（见 `classify` 的 docstring）。
+    """
+    _intent, _confidence, multi_intent = await classify(query)
+    assert multi_intent is True, f"「{query}」含两个诉求，应标为多意图"
 
 
 @requires_api_key
@@ -104,8 +123,9 @@ async def test_format_error_degrades_to_default_intent(monkeypatch):
         raise LLMFormatError("模型未返回 tool_calls")
 
     monkeypatch.setattr("app.graph.nodes.structured_call", boom)
-    intent, confidence = await classify("随便问点什么")
+    intent, confidence, multi_intent = await classify("随便问点什么")
     assert (intent, confidence) == (DEFAULT_INTENT, 0.0)
+    assert multi_intent is False       # 降级时不能凭空宣称"多意图"
 
 
 async def test_out_of_vocabulary_intent_degrades(monkeypatch):
@@ -113,10 +133,10 @@ async def test_out_of_vocabulary_intent_degrades(monkeypatch):
 
     async def weird(*_args, **_kwargs):
         """假的结构化调用：返回一个语法正确、但**不在白名单里**的意图词。"""
-        return {"intent": "退款", "confidence": 0.9}   # 「退款」不在 12 类里
+        return {"intent": "退款", "confidence": 0.9, "multi_intent": False}
 
     monkeypatch.setattr("app.graph.nodes.structured_call", weird)
-    intent, _ = await classify("我要退款")
+    intent, _confidence, _multi = await classify("我要退款")
     assert intent == DEFAULT_INTENT
 
 
@@ -128,10 +148,10 @@ async def test_node_falls_back_to_raw_query_when_resolved_empty(monkeypatch):
     """
     seen: list[str] = []       # 记录节点实际传下去的 query，用于断言
 
-    async def capture(query: str):
+    async def capture(query: str) -> tuple[str, float, bool]:
         """假的 classify：只记录入参，返回固定结果。"""
         seen.append(query)
-        return "闲聊", 0.9
+        return "闲聊", 0.9, False
 
     monkeypatch.setattr("app.graph.nodes.classify", capture)
     result = await classify_intent({"raw_query": "在吗", "resolved_query": ""})

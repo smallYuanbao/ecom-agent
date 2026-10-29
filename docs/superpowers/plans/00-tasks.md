@@ -101,6 +101,7 @@
 | P5-8 | 演示场景 4 验收 | L8 | 手工记录 | 离开再回来完整走通 |
 | P5-9 | **E 出口只读 ReAct**：harness（工具注册 / 循环 / 步数封顶 / trace）+ 兜底接入 | 架构取舍讨论 | `app/core/react.py`、`app/graph/fallback_agent.py` | 规则未命中的长尾能调工具作答；写操作不在工具集；超 4 步收敛到脚本 |
 | P5-10 | *(可选)* **B2**：B 出口参数失败分支接 ReAct | 同 P5-9 | 复用 `app/core/react.py` | 仅当评测显示「参数抽取失败 / 需澄清」占比 > 20% 时做 |
+| P5-11 | **多意图澄清**：`multi_intent=true` 时反问「您想先处理哪一件？」，`pending_question` 记住选择，下一轮接回 | M4、M6 | `app/graph/state.py`、`app/graph/nodes.py` | 双诉求输入 → 反问 → 下一轮「先查物流」能接回 data 出口 |
 
 **P5-9 / P5-10 的取舍**（依据：Agent 与 Workflow 边界讨论）
 

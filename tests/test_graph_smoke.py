@@ -21,9 +21,9 @@ def force_intent(monkeypatch):
     """
 
     def _set(intent: str, confidence: float = 0.9) -> None:
-        async def fake(query: str) -> tuple[str, float]:
-            """假分类：不看 query，直接返回调用方指定的意图。"""
-            return intent, confidence
+        async def fake(query: str) -> tuple[str, float, bool]:
+            """假分类：不看 query，直接返回调用方指定的意图（三元组，含 multi_intent）。"""
+            return intent, confidence, False
 
         monkeypatch.setattr("app.graph.nodes.classify", fake)
 

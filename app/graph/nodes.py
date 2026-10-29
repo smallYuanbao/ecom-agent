@@ -23,8 +23,20 @@ async def resolve_reference(state: ConversationState) -> dict:
     return {"resolved_query": state.get("raw_query", "")}
 
 
-async def classify(query: str) -> tuple[str, float]:
-    """一次 LLM 调用判意图，返回 `(intent, confidence)`。
+async def classify(query: str) -> tuple[str, float, bool]:
+    """一次 LLM 调用判意图，返回 `(intent, confidence, multi_intent)`。
+
+    `multi_intent` 表示"这句话里还有别的诉求"。它与 confidence **不是一回事**：
+
+    | 情况 | confidence | multi_intent |
+    |---|---|---|
+    | 句子模糊、系统拿不准 | 低 | false |
+    | 两个诉求都很明确、主诉求也确定 | **可以很高** | **true** |
+
+    混在一个数里，下游就没法区分"该追问澄清"还是"该让用户二选一"。
+
+    **本章只产出这个信号，不消费**：Ch02 是单轮，没有 `pending_question` 可挂；
+    Ch05 才会据此生成「您想先处理哪一件？」并记住等的是哪个选择。
 
     **可恢复的错误一律降级成「其他」**（模型没按格式返回、意图越界）——
     分类失败最多是这轮走兜底，不该让请求挂掉。
@@ -36,12 +48,13 @@ async def classify(query: str) -> tuple[str, float]:
             INTENT_TOOL_NAME, INTENT_PARAMETERS, intent_messages(query)
         )
     except LLMFormatError:
-        return DEFAULT_INTENT, 0.0
+        return DEFAULT_INTENT, 0.0, False
 
     intent = str(data.get("intent", ""))
     if intent not in INTENT_TO_ROUTE:          # 越界：模型返回了清单外的词
-        return DEFAULT_INTENT, 0.0
-    return intent, float(data.get("confidence", 0.0))
+        return DEFAULT_INTENT, 0.0, False
+    confidence = float(data.get("confidence", 0.0))
+    return intent, confidence, bool(data.get("multi_intent", False))
 
 
 async def classify_intent(state: ConversationState) -> dict:
@@ -49,9 +62,12 @@ async def classify_intent(state: ConversationState) -> dict:
 
     `route` 必须在这里写进 state——条件边函数没有写权限。它与 `route_by_intent`
     查同一张 `INTENT_TO_ROUTE`，所以 state 里的 route 和图实际走的分支不会不一致。
+
+    `multi_intent` **暂不写进 state**：本章没有消费者（单轮、无追问），
+    等 Ch05 做多意图澄清时再落 state + `pending_question`。
     """
     query = state.get("resolved_query") or state.get("raw_query", "")
-    intent, confidence = await classify(query)
+    intent, confidence, _multi_intent = await classify(query)
     return {
         "intent": intent,
         "intent_confidence": confidence,
