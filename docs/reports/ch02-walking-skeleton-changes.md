@@ -9,7 +9,7 @@
 | 1 | 2026-10-29 | 状态定义与主图骨架（五出口全占位） | `98abfb6` |
 | 2 | 2026-10-29 | 意图分类（12 类） | `45f33f8` |
 | 3 | 2026-10-29 | 路由与占位出口测试 | `e0d3787` |
-| 4 | | 知识库切分与入库 | |
+| 4 | 2026-10-29 | 知识库切分与入库 | `f4bee0c` |
 | 5 | | 混合检索 | |
 | 6 | | 证据闸与兜底落池 | |
 | 7 | | 知识出口子图 | |
@@ -158,3 +158,41 @@
 - `uv run pytest tests/test_routing.py -q` → **36 passed**
 - `uv run pytest -q` → **102 passed**
 - `uv run ruff check app tests scripts` → All checks passed
+
+---
+
+## 4 · 知识库切分与入库（`f4bee0c`）
+
+### 新增
+
+| 文件 | 内容 |
+|---|---|
+| `data/kb/returns.md` | 7 节：适用范围 / 不适用商品 / 完好判定 / 运费承担 / 赠品 / 到账时间 / 本文档不提供什么 |
+| `data/kb/shipping.md` | 5 节：包邮门槛 / 发货时效 / 物流异常 / 运费险 / 不提供什么 |
+| `data/kb/invoice.md` | 5 节：发票类型 / 开票时限 / 专票条件 / 修改重开 / 不提供什么 |
+| `data/kb/member.md` | 5 节：三档等级 / 各档权益 / 积分规则 / 降级 / 不提供什么 |
+| `data/kb/promo.md` | 6 节：券类型 / 门槛算法 / 叠加规则 / 有效期 / 退款后处理 / 不提供什么 |
+| `data/kb/products.md` | 7 节：6 个 SKU 各一节 + 型号交叉点与选购提示 |
+| `data/kb/regulations/seven-day-return.md` | 第六/七/八/十/十二条，**原文照录** gov.cn，未改写 |
+| `app/kb/loader.py` | `cn_to_int()` / `split_sections()` / `load_chunks()` |
+| `app/core/kb_version.py` | `kb_version()`：(id, text) 排序后 sha256 前 12 位 |
+| `scripts/build_kb.py` | `ensure_collection()` / `embed_all()` / `existing_ids()` / `main()` |
+| `tests/test_kb_loader.py` | 17 条：6 文档 5 法规齐全 / id 唯一 / 标题进 text / 排序稳定 / 条号转换 / 哈希确定性与敏感性 |
+
+### 关键决策
+
+| 决策 | 选择 | 备选与理由 |
+|---|---|---|
+| 切分规则 | **只按 `## ` 切，文档与法规共用** | 两套解析器：法规文件里每个 `## 第六条` 正好是一条，没必要写第二套 |
+| 法规文本 | **原文照录 + 注明出处** | 自己改写：法规原文是合规依据，改写会失真；且政策文本不适用著作权（著作权法第五条） |
+| 标题是否进 text | **进** | 只存正文：「本文档不提供什么」这种小节脱离标题完全看不懂；BM25 也拿不到「运费」「完好」这些关键词 |
+| 条号解析 | **中文数字转整数，非法写法报错** | 宽松解析：`art-0零6` 这类脏 id 一旦进库，引用就永远对不上 |
+| 库与语料的一致性 | **upsert 后删除多余 id** | 只 upsert：从文档里删掉的小节会永远留在库里，检索引到已不存在的内容 |
+| 集合空间 | **建完回读校验是 cosine** | 只写不查：Chroma 默认 l2，写进去也是"成功"的，直到闸永远不通过才发现 |
+
+### 验证
+- `uv run python scripts/build_kb.py` → `chunks=40  kb_version=88bfd0a6a44b`
+- 集合 `ecom_kb`：space=cosine、dim=1024、40 条
+- 零向量查询返回 distance=1.0（cosine 空间下的正确值，l2 不会是这个数）
+- 真实查询「退货运费谁承担」→ top1 `returns#退货运费由谁承担`，similarity **0.776**
+- `uv run pytest -q` → **119 passed**
