@@ -7,7 +7,7 @@
 | # | 日期 | 任务 | commit |
 |---|---|---|---|
 | 1 | 2026-10-29 | 状态定义与主图骨架（五出口全占位） | `98abfb6` |
-| 2 | | 意图分类（12 类） | |
+| 2 | 2026-10-29 | 意图分类（12 类） | `45f33f8` |
 | 3 | | 路由与占位出口测试 | |
 | 4 | | 知识库切分与入库 | |
 | 5 | | 混合检索 | |
@@ -47,6 +47,41 @@
 - **五个出口各自成函数**：共用单个 `placeholder` 省 20 行，但替换时得改分发逻辑；独立函数可整块替换。
 
 ### 验证
-- `uv run pytest tests/test_graph_smoke.py -q` → 4 passed
+- `uv run pytest tests/test_graph_smoke.py -q` → 17 passed
 - `uv run pytest -q` → 34 passed（Ch01 的 30 条不受影响）
 - `uv run ruff check app tests` → All checks passed
+
+---
+
+## 2 · 意图分类（12 类）（`45f33f8`）
+
+### 新增
+
+| 文件 | 内容 |
+|---|---|
+| `app/core/llm.py` | `LLMFormatError` / `get_client()`（`lru_cache`）/ `structured_call()`（`tool_choice` 强制 function_calling，重试 1 次，`temperature=0`，`timeout=30s`） |
+| `app/core/prompts.py` | `INTENT_SYSTEM`（12 类 + 四对易混 + 拿不准选「其他」）/ `INTENT_PARAMETERS`（enum 派生自路由表）/ `intent_messages()`（用户输入用 `<user_input>` 包裹） |
+| `tests/test_intent.py` | 12 例真实模型（每类一句）+ 4 条 mock 降级路径（格式错误 / 越界意图 / 回落原话 / route 一致性） |
+
+### 修改与原因
+
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+|---|---|---|---|
+| `nodes.py` · `classify_intent` | 占位：一律判「其他」，置信度 0 | 调 `classify()` 做真实 12 类分类，写 `intent` / `intent_confidence` / `route` | Task 2 的目标就是把占位换掉；再往下走 Task 3 的路由测试需要真实意图才能验证 |
+| `nodes.py` · 新增 `classify()` | 无 | 一次 LLM 调用 + **白名单校验**：返回值不在 `INTENT_TO_ROUTE` 里就降级「其他」 | 模型会返回清单外的词（如「退款」）。只靠 `route_by_intent` 的 `.get(默认值)` 兜底，`state["intent"]` 里会留下一个不存在的意图，污染日志与后续统计 |
+| `nodes.py` · 异常处理 | 计划原稿：只说"解析失败/越界 → 其他" | 只捕获 `LLMFormatError`；网络/鉴权异常**上抛** | 一律吞掉会把"密钥配错"伪装成"所有问题都答不上来"，排查时被误导。格式错误可恢复，服务错误不可恢复，必须分开 |
+| `routing.py` · 新增 `INTENTS` / `DEFAULT_INTENT` | prompt 里的 12 类与代码里的路由表各写一份 | 从 `INTENT_TO_ROUTE` 派生 | 两份清单会漂移（改了路由表忘了改 prompt）。派生后不可能不一致 |
+| `tests/conftest.py` · 新增自动夹具 | 无 | 每个测试结束 `close()` + `cache_clear()` LLM 客户端 | `get_client()` 用 `lru_cache`，而 pytest-asyncio 每测试一个新事件循环；缓存的 httpx 连接属于旧循环，下一个测试直接报 `Event loop is closed`（首轮 6 个测试因此失败） |
+| `tests/test_graph_smoke.py` · 数据来源 | 直接 `ainvoke` 真实流程 | `monkeypatch` 钉死分类结果，12 意图逐个验证分流 | 接了真实分类后，冒烟测试会变成"每次都调模型"：慢、要密钥、结果有抖动。**接线测试与模型测试要分开** |
+
+### 关键设计点
+
+- **异常分两层**：`LLMFormatError` → 降级成安全默认值；网络/鉴权 → 上抛由 API 层回 `error` 帧。吞掉后者会让配置问题伪装成业务问题。
+- **清单单一来源**：`INTENTS` 从 `INTENT_TO_ROUTE` 派生，prompt 的 enum 再从 `INTENTS` 派生，三层只有一份真数据。
+- **测试分层**：`test_intent.py` 用真模型（准不准），`test_graph_smoke.py` 用 mock（通不通）。
+
+### 验证
+- `uv run pytest tests/test_intent.py -q` → **16 passed（12/12 命中，验收线 ≥11）**
+- `uv run pytest -q` → **63 passed**
+- `uv run ruff check app tests` → All checks passed
+- 连通性预检：`chat.completions` 与 `tool_choice` 强制调用均正常返回
