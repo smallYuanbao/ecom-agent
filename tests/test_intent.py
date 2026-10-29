@@ -1,7 +1,32 @@
 """意图分类：12 类各一例（真实模型）+ 降级路径（mock，不走网络）。
 
-验收标准：12 例中 ≥11 命中（允许 1 例失败并记录）。
-没有 `CHAT_API_KEY` 时整体跳过——不要让缺密钥的机器上跑出一堆红。
+## 这个文件是怎么被执行的
+
+**没有显式调用方**——`uv run pytest` 是调用方。收集规则来自三处约定：
+
+| 层级 | 约定 | 出处 |
+|---|---|---|
+| 目录 | `tests/` | `pyproject.toml` 的 `testpaths` |
+| 文件 | `test_*.py` | pytest 默认约定（改成 `check_*.py` 就收不到，且不报错） |
+| 函数 | `test_` 开头 | 同上 |
+
+收集到之后：
+- `@pytest.mark.parametrize` 在**收集阶段**把 `CASES` 的 12 行展开成 12 个独立用例，
+  各自有 id，一个失败不影响其他
+- `async def` 由 pytest-asyncio 插件包装成同步调用（`pyproject` 设了 `asyncio_mode="auto"`，
+  不用逐个加 `@pytest.mark.asyncio`）
+- 带 `@requires_api_key` 的用例在无密钥机器上 **skip**，不是 fail
+
+## 两类测试，不要混
+
+| 类型 | 用例 | 要密钥 | 验证什么 |
+|---|---|---|---|
+| 集成 | `test_intent_classification` ×12、`test_node_writes_route...` | ✅ | 模型判得对不对 / 真实调用链通不通 |
+| 单元 | `test_format_error...`、`test_out_of_vocabulary...`、`test_node_falls_back...` | ❌ | 异常分支怎么降级 |
+
+**能用真实调用验证的，就别 mock**；只有"现实中难以复现的异常"才值得 mock。
+
+验收标准：12 例中 ≥11 命中（允许 1 例失败并记录）。实测 12/12。
 """
 import pytest
 
@@ -47,10 +72,35 @@ async def test_node_writes_route_consistent_with_routing_table():
     assert result["route"] == "rules"
 
 
+# ─────────────────────────────────────────────────────────────────────
+# 以下三条是单元测试：用 monkeypatch 拦住外部依赖，完全不发网络请求。
+#
+# 【为什么不走网络】
+#   `classify()` 里写的是 `structured_call(...)`，调用时去 `app.graph.nodes`
+#   这个模块的全局字典里查这个名字。把那个变量换成假函数，就根本走不到
+#   AsyncOpenAI，自然也不会发 HTTP。
+#
+# 【为什么 patch `app.graph.nodes.structured_call` 而不是 `app.core.llm.structured_call`】
+#   `from app.core.llm import structured_call` 会在 nodes 模块里**新建一个同名变量**，
+#   两者指向同一个函数对象，但是两个独立的绑定。改定义处（llm）不会影响
+#   使用处（nodes）已经绑好的名字。
+#   口诀：**patch 使用处，不是定义处。**
+#
+# 【monkeypatch 是 pytest 内置夹具】
+#   它记录每次修改，测试结束（无论通过还是失败）自动还原。若直接
+#   `nodes.structured_call = boom` 手工赋值，脏数据会漏给后面的测试，
+#   而且报错位置离真正原因很远，极难排查。
+# ─────────────────────────────────────────────────────────────────────
+
+
 async def test_format_error_degrades_to_default_intent(monkeypatch):
     """模型没按格式返回 → 降级成「其他」，不抛异常。"""
 
-    async def boom(*args, **kwargs):
+    async def boom(*_args, **_kwargs):
+        """假的结构化调用：直接抛格式错误，模拟模型没返回 tool_calls。
+
+        参数名带下划线前缀 = 明确表示"接收但故意不用"（要兼容真实函数的签名）。
+        """
         raise LLMFormatError("模型未返回 tool_calls")
 
     monkeypatch.setattr("app.graph.nodes.structured_call", boom)
@@ -61,7 +111,8 @@ async def test_format_error_degrades_to_default_intent(monkeypatch):
 async def test_out_of_vocabulary_intent_degrades(monkeypatch):
     """模型返回了清单外的意图词 → 也降级成「其他」，不让 KeyError 冒出来。"""
 
-    async def weird(*args, **kwargs):
+    async def weird(*_args, **_kwargs):
+        """假的结构化调用：返回一个语法正确、但**不在白名单里**的意图词。"""
         return {"intent": "退款", "confidence": 0.9}   # 「退款」不在 12 类里
 
     monkeypatch.setattr("app.graph.nodes.structured_call", weird)
@@ -70,10 +121,15 @@ async def test_out_of_vocabulary_intent_degrades(monkeypatch):
 
 
 async def test_node_falls_back_to_raw_query_when_resolved_empty(monkeypatch):
-    """`resolved_query` 为空时回落原话，不能把空串送去分类。"""
-    seen: list[str] = []
+    """`resolved_query` 为空时回落原话，不能把空串送去分类。
+
+    这里 patch 的是 `classify`（不是 `structured_call`）——测的是**节点**的取值逻辑，
+    不需要走到模型那一层。patch 得越靠上，测试越快、越稳。
+    """
+    seen: list[str] = []       # 记录节点实际传下去的 query，用于断言
 
     async def capture(query: str):
+        """假的 classify：只记录入参，返回固定结果。"""
         seen.append(query)
         return "闲聊", 0.9
 

@@ -11,10 +11,18 @@ from app.graph.routing import INTENT_TO_ROUTE
 
 @pytest.fixture
 def force_intent(monkeypatch):
-    """把分类结果钉死，让测试离线且确定。"""
+    """把分类结果钉死，让测试离线且确定。
+
+    做法与 `test_intent.py` 里的 mock 相同：把 `app.graph.nodes` 模块里的
+    `classify` 换成假函数。**patch 的是「使用处」**——`classify_intent` 调
+    `classify` 时去的就是这个模块的全局字典。
+
+    `monkeypatch` 是 pytest 内置夹具，测试结束自动还原，不会污染后续用例。
+    """
 
     def _set(intent: str, confidence: float = 0.9) -> None:
         async def fake(query: str) -> tuple[str, float]:
+            """假分类：不看 query，直接返回调用方指定的意图。"""
             return intent, confidence
 
         monkeypatch.setattr("app.graph.nodes.classify", fake)

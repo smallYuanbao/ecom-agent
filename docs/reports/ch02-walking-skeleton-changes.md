@@ -85,3 +85,12 @@
 - `uv run pytest -q` → **63 passed**
 - `uv run ruff check app tests` → All checks passed
 - 连通性预检：`chat.completions` 与 `tool_choice` 强制调用均正常返回
+
+### 补记 · 测试说明注释（无逻辑变更）
+
+| 文件 · 符号 | 补了什么 |
+|---|---|
+| `tests/test_intent.py` · 模块 docstring | pytest 的收集规则（目录/文件名/函数名前缀）、`parametrize` 展开成 12 条、`async def` 由 pytest-asyncio 包装、`skipif` 是 skip 不是 fail；两类测试的分工表 |
+| `tests/test_intent.py` · 三条 mock 用例上方 | monkeypatch 的两条要点：**为什么不走网络**（调的是模块全局里的名字）、**为什么 patch 使用处而不是定义处**（`from ... import` 新建独立绑定）；以及自动还原的机制 |
+| `tests/test_intent.py` · `boom` / `weird` / `capture` | 说明各自模拟什么、`*_args` 下划线前缀表示"接收但故意不用" |
+| `tests/test_graph_smoke.py` · `force_intent` | 与 `test_intent` 同一套 mock 机制；说明 patch 的是使用处 |
