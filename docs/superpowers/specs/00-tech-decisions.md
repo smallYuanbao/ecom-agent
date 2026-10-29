@@ -92,6 +92,12 @@ class ChromaRetriever: ...      # 现在
 
 **影响章节**：Ch02
 
+**实测后补记（2026-10-30）**：我们的语料上 BM25 明显弱于向量检索
+（hit@3 0.71 vs 0.98，42 条查询），因此 **默认策略改为 dense**，
+BM25 与 RRF 的实现保留、可通过 `RETRIEVAL_STRATEGY` 切换。
+Ch07 扩到 100+ 条样本后复核——删掉还是保留，由那时的数据决定。
+见 [retrieval-eval.md](../../reports/retrieval-eval.md)。
+
 **你的选择**：___A___
 
 ---

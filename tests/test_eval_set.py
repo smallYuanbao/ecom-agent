@@ -30,16 +30,15 @@ def test_expect_ids_exist_in_corpus():
     """expect_id 必须对得上当前 chunk id——语料改了这里会先红。"""
     known = {c["id"] for c in load_chunks()}
     for case in load_cases():
-        if case.expect_id is None:
-            continue
-        assert case.expect_id in known, f"{case.id} 的 expect_id 不在语料里：{case.expect_id}"
+        for expect_id in case.expect_ids:
+            assert expect_id in known, f"{case.id} 的 expect_id 不在语料里：{expect_id}"
 
 
 def test_refuse_cases_have_no_expectation():
     """该拒答的题不能同时声明"期望命中某块"——语义矛盾。"""
     for case in load_cases():
         if case.should_refuse:
-            assert case.expect_id is None, f"{case.id} 既拒答又要求命中"
+            assert case.expect_ids == [], f"{case.id} 既拒答又要求命中"
             assert case.expect_points == []
 
 

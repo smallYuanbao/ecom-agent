@@ -27,7 +27,7 @@ class EvalCase:
 
     id: str
     bucket: str
-    expect_id: str | None          # 期望命中的 chunk id；should_refuse 时为 None
+    expect_ids: list[str]          # 任一命中即算对；should_refuse 时为空
     expect_points: list[str]       # 答案里必须出现的字面要点
     should_refuse: bool
     queries: list[dict[str, str]]  # [{"q": "...", "style": "formal"}]
@@ -45,7 +45,7 @@ class EvalQuery:
     bucket: str
     style: str
     query: str
-    expect_id: str | None
+    expect_ids: list[str]
     expect_points: list[str]
     should_refuse: bool
 
@@ -54,7 +54,7 @@ def _parse_case(raw: dict[str, Any]) -> EvalCase:
     return EvalCase(
         id=raw["id"],
         bucket=raw["bucket"],
-        expect_id=raw.get("expect_id"),
+        expect_ids=list(raw.get("expect_ids") or []),
         expect_points=list(raw.get("expect_points") or []),
         should_refuse=bool(raw.get("should_refuse", False)),
         queries=list(raw["queries"]),
@@ -80,7 +80,7 @@ def load_queries(path: Path | None = None) -> list[EvalQuery]:
                     bucket=case.bucket,
                     style=item["style"],
                     query=item["q"],
-                    expect_id=case.expect_id,
+                    expect_ids=case.expect_ids,
                     expect_points=case.expect_points,
                     should_refuse=case.should_refuse,
                 )

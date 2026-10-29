@@ -15,7 +15,9 @@ cases:
   # ── 政策 ────────────────────────────────────────────────
   - id: P1
     bucket: policy
-    expect_id: "returns#七日无理由退货的适用范围"
+    expect_ids:
+      - "returns#七日无理由退货的适用范围"
+      - "returns#不适用无理由退货的商品"   # 同属"退货政策"，两节都算对
     expect_points: ["7 个自然日", "签收次日"]
     should_refuse: false
     queries:
@@ -25,7 +27,7 @@ cases:
 
   - id: P2
     bucket: policy
-    expect_id: "returns#退货运费由谁承担"
+    expect_ids: ["returns#退货运费由谁承担"]
     expect_points: ["质量问题", "12 元"]
     should_refuse: false
     queries:
@@ -35,7 +37,9 @@ cases:
 
   - id: P3
     bucket: policy
-    expect_id: "returns#商品完好的判定"
+    expect_ids:
+      - "returns#商品完好的判定"
+      - "art-008"                          # 第八条就是"完好标准"的法规原文
     expect_points: ["查验", "完好"]
     should_refuse: false
     queries:
@@ -46,7 +50,7 @@ cases:
   - id: P4
     bucket: policy
     # 反向用例：看起来像该拒答，其实语料里有答案（港澳台及海外不发货）
-    expect_id: "shipping#包邮门槛"
+    expect_ids: ["shipping#包邮门槛"]
     expect_points: ["99 元", "199 元"]
     should_refuse: false
     queries:
@@ -56,7 +60,7 @@ cases:
 
   - id: P5
     bucket: policy
-    expect_id: "shipping#运费险"
+    expect_ids: ["shipping#运费险"]
     expect_points: ["12 元", "上门取件"]
     should_refuse: false
     queries:
@@ -66,7 +70,7 @@ cases:
 
   - id: P6
     bucket: policy
-    expect_id: "invoice#开票时间限制"
+    expect_ids: ["invoice#开票时间限制"]
     expect_points: ["30 天", "24 小时"]
     should_refuse: false
     queries:
@@ -76,7 +80,7 @@ cases:
 
   - id: P7
     bucket: policy
-    expect_id: "member#各等级的权益"
+    expect_ids: ["member#各等级的权益"]
     expect_points: ["98 折", "95 折"]
     should_refuse: false
     queries:
@@ -86,7 +90,7 @@ cases:
 
   - id: P8
     bucket: policy
-    expect_id: "promo#叠加规则"
+    expect_ids: ["promo#叠加规则"]
     expect_points: ["不可叠加", "会员折扣"]
     should_refuse: false
     queries:
@@ -97,7 +101,7 @@ cases:
   # ── 商品规格（型号精确命中，BM25 的主场）────────────────────
   - id: S1
     bucket: spec
-    expect_id: "products#婴儿推车 ST-20 轻便伞车"
+    expect_ids: ["products#婴儿推车 ST-20 轻便伞车"]
     expect_points: ["15kg", "可登机"]
     should_refuse: false
     queries:
@@ -107,7 +111,7 @@ cases:
 
   - id: S2
     bucket: spec
-    expect_id: "products#儿童安全座椅 CS-04"
+    expect_ids: ["products#儿童安全座椅 CS-04"]
     expect_points: ["反向", "13kg"]
     should_refuse: false
     queries:
@@ -117,7 +121,7 @@ cases:
 
   - id: S3
     bucket: spec
-    expect_id: "products#辅食机 FB-30"
+    expect_ids: ["products#辅食机 FB-30"]
     expect_points: ["洗碗机", "24 个月"]
     should_refuse: false
     queries:
@@ -128,7 +132,7 @@ cases:
   # ── 法规（引用要能对上条号）──────────────────────────────
   - id: R1
     bucket: regulation
-    expect_id: "art-006"
+    expect_ids: ["art-006"]
     expect_points: ["定作", "音像制品"]
     should_refuse: false
     queries:
@@ -138,7 +142,7 @@ cases:
 
   - id: R2
     bucket: regulation
-    expect_id: "art-010"
+    expect_ids: ["art-010"]
     expect_points: ["次日", "七日"]
     should_refuse: false
     queries:
@@ -148,7 +152,9 @@ cases:
 
   - id: R3
     bucket: regulation
-    expect_id: "art-012"
+    expect_ids:
+      - "art-012"
+      - "returns#赠品与各类优惠形式的处理"  # 平台细则复述了同一条规则
     expect_points: ["赠品", "一并退回"]
     should_refuse: false
     queries:
@@ -159,7 +165,7 @@ cases:
   # ── 该拒答（语料里确实没有）──────────────────────────────
   - id: N1
     bucket: refuse
-    expect_id: null
+    expect_ids: []
     expect_points: []
     should_refuse: true
     queries:

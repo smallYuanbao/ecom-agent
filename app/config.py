@@ -30,11 +30,15 @@ class Settings(BaseSettings):
     # Embedding：本地 Ollama，bge-m3 输出 1024 维
     ollama_base_url: str = "http://localhost:11434"
 
-    # 检索参数：起步值，未校准。语料约 30 个 chunk，调参容易过拟合 10 题评测
+    # 检索参数：起步值，未校准。语料 40 个 chunk，调参容易过拟合 45 条评测
     dense_top_k: int = 20
     sparse_top_k: int = 20
     rrf_k: int = 60
     evidence_threshold: float = 0.45   # 余弦相似度下限（similarity = 1 - distance）
+
+    # 检索策略：dense / bm25 / hybrid。默认值由 Task 5 的实验决定，
+    # 见 docs/reports/retrieval-eval.md
+    retrieval_strategy: str = "dense"
 
     prompt_version: str = "v1"
     kb_version: str = ""          # 运行时由知识库内容哈希填充
