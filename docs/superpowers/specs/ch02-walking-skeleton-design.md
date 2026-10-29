@@ -50,7 +50,8 @@ app/
   graph/
     state.py           # ConversationState（D6 B+ 字段子集）
     build.py           # 主图 + 条件边
-    nodes.py           # 分类 / 路由 / 占位 / D / E
+    routing.py         # INTENT_TO_ROUTE（12→5）+ route_by_intent（纯函数）
+    nodes.py           # resolve_reference / classify_intent / 五个 *_exit
     knowledge.py       # 知识出口子图
   core/
     llm.py             # openai SDK 封装（function_calling 结构化）

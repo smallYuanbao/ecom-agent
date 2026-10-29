@@ -31,6 +31,7 @@
 - Create: `app/graph/state.py`
 - Create: `app/graph/build.py`
 - Create: `app/graph/nodes.py`（先放占位节点）
+- Create: `app/graph/routing.py`（路由表 + 条件边函数，静态数据，无依赖）
 - Test: `tests/test_graph_smoke.py`
 
 **Interfaces:**
@@ -40,9 +41,15 @@
 class ConversationState(TypedDict, total=False):  # 字段见 spec
     ...
 
+# routing.py
+INTENT_TO_ROUTE: dict[str, str]      # 12 → 5
+def route_by_intent(state) -> str
+
 # build.py
 def build_graph() -> CompiledGraph
 ```
+
+**为什么路由表在 Task 1**：`build_graph` 的条件边必须有它才能建图。它是纯静态数据（12 条映射），没有任何依赖，提前建不影响后面任务——任务顺序按依赖排，不按"表属于路由"这种直觉排。
 
 **Step 1: 状态**
 
@@ -50,15 +57,31 @@ def build_graph() -> CompiledGraph
 
 **Step 2: 图（五个出口先全占位）**
 
+**命名约定：节点名跟出口名，函数名加 `_exit` 后缀。**
+
+| 节点名 | 函数名 | 谁替换 |
+|---|---|---|
+| `resolve_reference` | `resolve_reference` | Ch05 |
+| `classify_intent` | `classify_intent` | Task 2 |
+| `knowledge` | `knowledge_exit` | Task 7（换成子图） |
+| `data` | `data_exit` | Ch04 |
+| `rules` | `rules_exit` | Ch03 |
+| `human` | `human_exit` | Task 8 |
+| `fallback` | `fallback_exit` | Task 8 |
+
+**节点名是契约**（出现在 trace、边、路由表、SSE 帧里，跨章不改），**函数是实现**（整块替换）。两者一一对应，看 trace 里的节点名能直接搜到函数。
+
+出口函数加 `_exit` 后缀，是因为 `data` / `knowledge` / `fallback` 作为函数名太泛，容易和变量、模块重名；后缀同时表明它是"出口的收尾函数"。
+
 ```python
 g = StateGraph(ConversationState)
-g.add_node("resolve_reference", passthrough)
-g.add_node("classify_intent", classify_intent_stub)   # Task 2 替换
-g.add_node("knowledge", placeholder)
-g.add_node("data", placeholder)
-g.add_node("rules", placeholder)
-g.add_node("human", placeholder)
-g.add_node("fallback", placeholder)
+g.add_node("resolve_reference", resolve_reference)      # 透传；Ch05 换真实实现
+g.add_node("classify_intent", classify_intent)          # Task 2 换成真实分类
+g.add_node("knowledge", knowledge_exit)                 # Task 7 换成知识子图
+g.add_node("data", data_exit)                           # Ch04 换成真实查询
+g.add_node("rules", rules_exit)                         # Ch03 换成 8 状态流水线
+g.add_node("human", human_exit)                         # Task 8 换成真实话术
+g.add_node("fallback", fallback_exit)                   # Task 8 换成三脚本
 g.set_entry_point("resolve_reference")
 g.add_edge("resolve_reference", "classify_intent")
 g.add_conditional_edges("classify_intent", route_by_intent, {
@@ -68,6 +91,54 @@ g.add_conditional_edges("classify_intent", route_by_intent, {
 for name in ("knowledge", "data", "rules", "human", "fallback"):
     g.add_edge(name, END)
 ```
+
+**骨架期另外两个节点的占位形态**（`app/graph/nodes.py`）：
+
+```python
+async def resolve_reference(state):     # Ch05 换成真实指代消解
+    return {"resolved_query": state["raw_query"], "trace": {"coref": "passthrough"}}
+
+async def classify_intent(state):       # Task 2 换成真实 12 类分类
+    return {"intent": "其他", "intent_confidence": 0.0, "route": "fallback"}
+```
+
+**五个出口函数的占位形态**（`app/graph/nodes.py`）：
+
+```python
+PLACEHOLDER_TEXT = {
+    "knowledge": "知识库检索正在开发中，您可以先转人工处理。",
+    "data":      "订单与库存查询正在开发中，您可以先转人工处理。",
+    "rules":     "退费核算正在开发中，您可以先转人工处理。",
+    "human":     "转人工功能正在开发中，请稍后再试。",
+    "fallback":  "我暂时没能理解您的问题，您可以换个说法，或转人工处理。",
+}
+
+def _placeholder(route: str) -> dict:
+    """所有占位出口共用：明确告知 + 带转人工动作，绝不返回金额。"""
+    return {"answer": PLACEHOLDER_TEXT[route],
+            "is_placeholder": True,
+            "actions": [{"type": "transfer_human"}]}
+
+
+async def knowledge_exit(state):        # Task 7 整块替换
+    return _placeholder("knowledge")
+
+async def data_exit(state):             # Ch04 整块替换
+    return _placeholder("data")
+
+async def rules_exit(state):            # Ch03 整块替换
+    return _placeholder("rules")
+
+async def human_exit(state):            # Task 8 整块替换
+    return _placeholder("human")
+
+async def fallback_exit(state):         # Task 8 整块替换
+    return _placeholder("fallback")
+```
+
+**为什么不共用单个 `placeholder` 函数**：五个出口将来各自演化（知识变子图、规则变流水线），**函数要能独立被替换**。共用一个是省了 20 行，代价是每次替换都得改分发逻辑。
+
+> `knowledge` 节点在 Task 7 会换成**编译后的子图对象**（`g.add_node("knowledge", build_knowledge_graph())`）——节点名不变，挂的东西从函数变成图。这是 LangGraph 允许的，也正是"名是契约、实现可换"的体现。
 
 **Step 3: 冒烟测试**
 
@@ -84,8 +155,7 @@ for name in ("knowledge", "data", "rules", "human", "fallback"):
 **Files:**
 - Create: `app/core/llm.py`（openai SDK 封装）
 - Create: `app/core/prompts.py`（意图 prompt）
-- Create: `app/graph/routing.py`（**本章只放 `INTENT_TO_ROUTE` 表**，Task 3 再补函数）
-- Modify: `app/graph/nodes.py`（`classify_intent`）
+- Modify: `app/graph/nodes.py`（`classify_intent` 换成真实实现）
 - Test: `tests/test_intent.py`
 
 **Interfaces:**
@@ -94,13 +164,10 @@ for name in ("knowledge", "data", "rules", "human", "fallback"):
 INTENTS = ("政策问答","商品规格","优惠券活动","会员权益","订单查询","物流查询",
            "库存价格","退款申请","价保申请","订单变更","投诉","闲聊")
 
-INTENT_TO_ROUTE: dict[str, str]                       # 12 → 5，Task 3 的条件边也读它
-
 async def classify(query: str) -> tuple[str, float]   # (intent, confidence)
 ```
 
-**为什么表放在 Task 2**：`classify_intent` 要把 `route` 写进 state（SSE 的 `route` 帧要用），
-它得查这张表。任务顺序按依赖排，不按"表属于路由"这种直觉排。
+路由表 `INTENT_TO_ROUTE` 已在 Task 1 建好，本任务只读不改。
 
 **Step 1: LLM 封装（function_calling 结构化）**
 
@@ -139,49 +206,39 @@ def structured_call(schema: dict, messages: list[dict]) -> dict:
 ### Task 3: 路由与占位节点
 
 **Files:**
-- Modify: `app/graph/routing.py`（补 `route_by_intent`；表在 Task 2 已建）
-- Modify: `app/graph/nodes.py`
 - Test: `tests/test_routing.py`
+- （`routing.py` 与 `nodes.py` 已在 Task 1 建好；本任务**不改实现**，只补测试与文案复核）
 
 **Interfaces:**
 
 ```python
-INTENT_TO_ROUTE: dict[str, str]   # 12 → 5（Task 2 已建）
-def route_by_intent(state) -> str # 纯函数：只返回键，不写 state
-async def placeholder(state) -> dict
+INTENT_TO_ROUTE: dict[str, str]   # 12 → 5（Task 1 已建，不改）
+def route_by_intent(state) -> str # 纯函数：只返回键，不写 state（Task 1 已建）
+# 五个出口函数已在 Task 1 定义（knowledge_exit / data_exit / …），本任务不改名
 ```
 
-**Step 1: 条件边函数**
+**Step 1: 复核条件边函数的兜底语义**
 
 ```python
 def route_by_intent(state) -> str:
     return INTENT_TO_ROUTE.get(state.get("intent", ""), "fallback")
 ```
 
-用 `.get(默认值)` 而不是 `[]`：意图越界（模型返回没见过的词）时兜到 `fallback`，不抛 `KeyError`。
+用 `.get(默认值)` 而不是 `[]`：意图越界（模型返回没见过的词）时兜到 `fallback`，不抛 `KeyError`。**本步骤只确认写法，不新增代码。**
 
-**Step 2: 占位节点**
+**Step 2: 占位文案定稿**
 
-```python
-PLACEHOLDER_TEXT = {
-    "data": "订单与库存查询正在开发中，您可以先转人工处理。",
-    "rules": "退费核算正在开发中，您可以先转人工处理。",
-}
-
-async def placeholder(state):
-    return {"answer": PLACEHOLDER_TEXT[state["route"]],
-            "is_placeholder": True,
-            "actions": [{"type": "transfer_human"}]}
-```
+Task 1 已放好五个 `*_exit` 函数与 `PLACEHOLDER_TEXT`；本任务只需按 spec 复核文案，确认每条都**明确告知"开发中"且不含任何数字**。
 
 **Step 3: 测试**
 
 - 12 意图 → 5 出口的映射逐个断言
-- **占位响应不得含金额**：正则 `\d+\s*元` 无命中
+- **占位响应不得含金额**：对五个出口分别断言正则 `\d+\s*元` 无命中
+- 每个出口返回的 `answer` 与 `PLACEHOLDER_TEXT[自己]` 一致（防止复制粘贴串行）
 
-**验收**：映射 12 条 + 占位 2 条测试绿。
+**验收**：映射 12 条 + 占位 5 条测试绿。
 
-**Commit:** `feat(graph): 意图路由表与占位出口（不含金额）`
+**Commit:** `test(graph): 12 意图 → 5 出口映射，占位出口不含金额`
 
 ---
 
@@ -340,6 +397,17 @@ def is_strong(hits: list[dict]) -> bool:
 def build_knowledge_graph() -> CompiledGraph   # retrieve → gate → generate | fallback
 ```
 
+**Step 0: 接入方式（节点名不变）**
+
+主图里把 `knowledge_exit` 换成子图对象，**节点名仍是 `knowledge`**：
+
+```python
+# build.py：这一行替换掉 Task 1 的 build_graph 中对应行
+g.add_node("knowledge", build_knowledge_graph())   # 编译后的子图可直接当节点
+```
+
+子图与主图**共享 `ConversationState`**（同名字段自动传递）：子图读 `resolved_query`，写 `evidence / citation_ids / answer`，主图照常从 state 取用。
+
 **Step 1: 子图**
 
 ```
@@ -373,15 +441,19 @@ retrieve → gate ─┬─ strong → generate
 
 **Step 1: D 出口（转人工）**
 
+替换 Task 1 的 `human_exit` 函数体，**函数名与节点名都不变**：
+
 ```python
-async def human_node(state):
+async def human_exit(state):                 # 节点名仍是 "human"
     return {"answer": "已为您转接人工客服，请稍候。",
             "actions": [{"type": "transfer_human"}]}
 ```
 
 **Step 2: E 出口（三脚本）**
 
-按意图文档：社交回应 / 确认致谢 / 无法处理。**注意**：本章只有单轮，致谢脚本先按关键词命中。
+替换 `fallback_exit` 的函数体，**节点名仍是 `fallback`**；三个子分支（社交回应 / 确认致谢 / 无法处理）用内部小函数实现，不再拆成图节点。
+
+**注意**：本章只有单轮，致谢脚本先按关键词命中。
 
 **验收**：三类输入各 1 例；投诉类响应含 `transfer_human`。
 
