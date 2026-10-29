@@ -31,6 +31,8 @@ uv run uvicorn app.main:app --reload --port 8080   # :8080（8000 被本地 Chro
 
 整体流程图见 [docs/diagrams/flow-overview.png](docs/diagrams/flow-overview.png)。
 逐任务的改动记录见 [docs/reports/00-change-log-overview.md](docs/reports/00-change-log-overview.md)（按章一份，如 `ch01-data-foundation-changes.md`）。
+想知道每个 Task 做完后**自己能跑什么**，见 [docs/reports/manual-checks.md](docs/reports/manual-checks.md)。
+手动试跑：`uv run python scripts/try.py intent "我买的推车能退吗"`。
 简历措辞与实现状态的对照见 [docs/reports/resume-positioning.md](docs/reports/resume-positioning.md)。
 
 ## 架构
