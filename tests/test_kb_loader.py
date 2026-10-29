@@ -36,7 +36,11 @@ def test_chunk_ids_are_unique():
 
 
 def test_every_chunk_has_title_in_text():
-    """标题拼进 text 是有意的：像「本文档不提供什么」这种小节，没有标题根本看不懂。"""
+    """标题拼进 text 是有意的：让「本文档不提供什么」这类小节保留"这是指令"的身份。
+
+    没有标题，`不计算退款金额` 会被读成一句政策，而不是"你别做这件事"。
+    这条测试守的是"别哪天顺手把 text 改成只存 body"。
+    """
     for chunk in load_chunks():
         assert chunk["text"].startswith(chunk["section"]), chunk["id"]
 
