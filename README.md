@@ -30,6 +30,7 @@ uv run uvicorn app.main:app --reload --port 8080   # :8080（8000 被本地 Chro
 | Ch08 | 前端：聊天 + SSE | ⏳ |
 
 整体流程图见 [docs/diagrams/flow-overview.png](docs/diagrams/flow-overview.png)。
+逐任务的改动记录见 [docs/reports/00-change-log-overview.md](docs/reports/00-change-log-overview.md)（按章一份，如 `ch01-data-foundation-changes.md`）。
 简历措辞与实现状态的对照见 [docs/reports/resume-positioning.md](docs/reports/resume-positioning.md)。
 
 ## 架构
