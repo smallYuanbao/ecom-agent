@@ -6,7 +6,7 @@
 import pytest
 
 from app.core.kb_version import kb_version
-from app.kb.loader import cn_to_int, load_chunks, split_sections
+from app.kb.loader import DATA_DIR, cn_to_int, load_chunks, split_sections
 
 EXPECTED_ARTICLE_NOS = {6, 7, 8, 10, 12}
 DOC_SOURCES = {
@@ -47,6 +47,33 @@ def test_every_chunk_has_title_in_text():
 
 def test_no_chunk_is_empty():
     assert all(c["text"].strip() for c in load_chunks())
+
+
+def test_no_chunk_exceeds_500_chars():
+    """守卫：单块超过 500 字，就该给切分器加长度上限了。
+
+    这条测试现在必然通过（最长 417 字）。它的价值在**将来**——
+    某天有人把一节写长了，这里变红，而不是等到检索效果莫名下降才排查。
+
+    真变红时的处理步骤：
+    1. 参考 `scripts/../app/kb/loader.py` 的 `split_sections`
+    2. 加 `chunk_size=400` + 按整句取 overlap（参考实现的做法）
+    3. **重建向量库**（chunk id 会变），并重跑评测集确认 expect_id 仍然有效
+    """
+    too_long = [(c["id"], len(c["text"])) for c in load_chunks() if len(c["text"]) > 500]
+    assert not too_long, f"超过 500 字的块：{too_long}"
+
+
+def test_tables_stay_small_enough_to_keep_headers():
+    """守卫：单表超过 10 行，就该做「按行切 + 每块重贴表头」了。
+
+    不重贴表头的话，被切开的后续块只剩一堆 `| 值 | 值 |`，完全看不懂。
+    现在全语料只有 1 个 5 行的表，所以不需要。
+    """
+    for path in sorted((DATA_DIR).glob("*.md")):
+        table_rows = sum(1 for line in path.read_text(encoding="utf-8").splitlines()
+                         if line.startswith("|"))
+        assert table_rows <= 10, f"{path.name} 有 {table_rows} 行表格，超过 10 行需要切分"
 
 
 def test_chunks_are_sorted_by_id():
