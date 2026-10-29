@@ -10,7 +10,7 @@
 | 2 | 2026-10-29 | 意图分类（12 类） | `45f33f8` |
 | 3 | 2026-10-29 | 路由与占位出口测试 | `e0d3787` |
 | 4 | 2026-10-29 | 知识库切分与入库 | `f4bee0c` |
-| 5 | | 混合检索 | |
+| 5 | 2026-10-30 | 混合检索（三策略实测选型） | `8152322` |
 | 6 | | 证据闸与兜底落池 | |
 | 7 | | 知识出口子图 | |
 | 8 | | D / E 出口 | |
@@ -196,3 +196,52 @@
 - 零向量查询返回 distance=1.0（cosine 空间下的正确值，l2 不会是这个数）
 - 真实查询「退货运费谁承担」→ top1 `returns#退货运费由谁承担`，similarity **0.776**
 - `uv run pytest -q` → **119 passed**
+
+---
+
+## 5 · 混合检索（`8152322`）
+
+### 新增
+
+| 文件 | 内容 |
+|---|---|
+| `app/core/retrieval.py` | `tokenize()` / `embed()` / `cosine()` / `dense_search()` / `bm25_search()` / `rrf_fuse()` / `search()` |
+| `scripts/eval_retrieval.py` | 三策略对比：Wilson 置信区间 + McNemar 不一致对数 + 失败样本 |
+| `docs/reports/retrieval-eval.md` | 自动生成的原始数据 |
+| `tests/test_retrieval.py` | 15 条：分词 / 余弦 / RRF 排序 / 契约字段 / 真实检索（服务不可用时跳过） |
+
+### 修改与原因
+
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+|---|---|---|---|
+| `config.py` · 新增 `retrieval_strategy` | 无（策略写死在 spec 里） | `dense` 默认，可切 `bm25` / `hybrid` | 策略要能被数据推翻；写死就只能改代码 |
+| `data/eval/*.yaml` · `expect_id` | 单个期望 chunk | **`expect_ids` 列表，任一命中即算对** | 「退货政策是什么」命中「不适用无理由退货的商品」也是对的。单值 gold 把正确答案判成失败，所有策略一起被低估 |
+| `scripts/eval_retrieval.py` · ranks 键 | `case_id:style` | 按下标与 queries 对齐 | **同题两个 formal 问法键冲突，后者覆盖前者**，n 被悄悄少算 → 指标虚高 |
+| `specs/ch02` 决策记录 | 「检索融合 = RRF，混合更好」 | 拆成三条：策略默认 dense、RRF 仅 hybrid 分支、BM25 保留但默认不用 | 原决策把「要不要混合」和「怎么融合」混成一条，前者从未被验证 |
+
+### 实测结果
+
+| 策略 | hit@3 | 95% CI | MRR | vs dense |
+|---|---|---|---|---|
+| **dense** | **0.98** | 0.88–1.00 | **0.937** | — |
+| bm25 | 0.71 | 0.56–0.83 | 0.565 | 11:0（显著更差） |
+| hybrid | 0.95 | 0.84–0.99 | 0.827 | 1:0（不显著） |
+
+**分桶**：dense 在 spec 9/9、regulation 9/9、policy 23/24；hybrid 分别为 9/9、9/9、22/24。
+
+**结论**：原假设「混合更好」不成立。hybrid 没提升 hit@3，MRR 反而低 0.11。
+按「看不出差别就选简单的」，默认改回 dense；BM25/RRF 保留为配置项，
+Ch07 扩样本后复核（BM25 的价值在稀有词长尾，45 条覆盖不到）。
+
+### 关键设计点
+
+- **分词必须定制**：jieba 默认把「退货运费」切成 `退 / 货运费`，把 `ST-20` 切成 `ST / - / 20`。
+  型号、条号、金额都是字面精确匹配场景，所以型号与数字走正则，其余走 `lcut_for_search`。
+- **RRF 分数不能当阈值**：`1/(60+rank)`，最大约 0.033，与 0.45 的闸阈值差一个数量级。
+  测试里专门加了一条守卫（`test_rrf_score_is_far_below_evidence_threshold`）。
+- **BM25 单独召回的块要补 similarity**：闸只认 similarity，补不上就等于无法判定。
+
+### 验证
+- `uv run python scripts/eval_retrieval.py` → 三行策略表（见上）
+- `uv run pytest -q` → **159 passed**
+- `uv run ruff check app tests scripts` → All checks passed
