@@ -114,7 +114,8 @@ def render(summaries: list[dict], raws: dict[str, dict], n_cases: int) -> str:
          "拒答题不计入检索指标）"),
         f"> 指标：hit@{HIT_AT}，取回 {TOP_K} 条候选",
         ("> **本文件是自动生成的原始数据**，决策与解读见 "
-         "`docs/superpowers/specs/ch02-walking-skeleton-design.md`「关键决策记录」。"),
+         "`docs/superpowers/specs/ch02-walking-skeleton-design.md`「关键决策记录」；"
+         "指标释义见 `docs/reports/metrics-glossary.md`。"),
         "",
         "## 总表",
         "",

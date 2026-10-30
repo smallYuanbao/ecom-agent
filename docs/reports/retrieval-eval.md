@@ -2,7 +2,7 @@
 
 > 评测集：`data/eval/knowledge_v1.yaml`（14 道基础题展开的查询，拒答题不计入检索指标）
 > 指标：hit@3，取回 5 条候选
-> **本文件是自动生成的原始数据**，决策与解读见 `docs/superpowers/specs/ch02-walking-skeleton-design.md`「关键决策记录」。
+> **本文件是自动生成的原始数据**，决策与解读见 `docs/superpowers/specs/ch02-walking-skeleton-design.md`「关键决策记录」；指标释义见 `docs/reports/metrics-glossary.md`。
 
 ## 总表
 
