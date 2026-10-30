@@ -34,7 +34,9 @@ class Settings(BaseSettings):
     dense_top_k: int = 20
     sparse_top_k: int = 20
     rrf_k: int = 60
-    evidence_threshold: float = 0.45   # 余弦相似度下限（similarity = 1 - distance）
+    # 余弦相似度下限。实测：可答题最低 0.566、拒答题最高 0.500，取 0.55
+    # 已知漏洞：域外问题「能分期付款吗」0.572 会越过——单阈值分不干净，见 app/core/gate.py
+    evidence_threshold: float = 0.55
 
     # 检索策略：dense / bm25 / hybrid。默认值由 Task 5 的实验决定，
     # 见 docs/reports/retrieval-eval.md
