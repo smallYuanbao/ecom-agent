@@ -75,18 +75,17 @@ async def classify_intent(state: ConversationState) -> dict:
     }
 
 
-# 占位话术：明确告知"开发中"，绝不出现任何金额（Ch02 验收第 3 条）
+# ── 占位出口（尚未实现的 B / C）─────────────────────────────
+# 话术要求：明确告知"开发中"，且**一个数字都不出现**——
+# 用户会把"约 3 个工作日""需 20 元"当成真实承诺。
 PLACEHOLDER_TEXT: dict[str, str] = {
-    "knowledge": "知识库检索正在开发中，您可以先转人工处理。",
     "data": "订单与库存查询正在开发中，您可以先转人工处理。",
     "rules": "退费核算正在开发中，您可以先转人工处理。",
-    "human": "转人工功能正在开发中，请稍后再试。",
-    "fallback": "我暂时没能理解您的问题，您可以换个说法，或转人工处理。",
 }
 
 
 def _placeholder(route: str) -> dict:
-    """五个占位出口共用的返回体：明确告知 + 带转人工动作，不返回任何数字。"""
+    """占位出口的返回体：明确告知 + 给转人工动作，不返回任何数字。"""
     return {
         "answer": PLACEHOLDER_TEXT[route],
         "is_placeholder": True,
@@ -94,14 +93,8 @@ def _placeholder(route: str) -> dict:
     }
 
 
-# 五个出口各写一个函数（而不是共用单个 placeholder）：
-# 它们将来各自演化，必须能被**独立替换**，且保证"每个出口说自己的话"。
-
-
-async def knowledge_exit(state: ConversationState) -> dict:
-    """A 知识出口：Task 7 换成知识子图（retrieve → gate → generate）。"""
-    return _placeholder("knowledge")
-
+# ── 各出口 ────────────────────────────────────────────────
+# 每个出口一个函数，便于独立替换与独立测试。
 
 async def data_exit(state: ConversationState) -> dict:
     """B 数据出口：Ch04 换成参数校验 → 工具 → 结果校验。"""
@@ -114,10 +107,63 @@ async def rules_exit(state: ConversationState) -> dict:
 
 
 async def human_exit(state: ConversationState) -> dict:
-    """D 转人工：Task 8 换成真实话术 + create_ticket。"""
-    return _placeholder("human")
+    """D 转人工：安慰 + 告知已转接，并给出 `transfer_human` 动作。
+
+    **本章不建工单**——`create_ticket` 在 Ch04（P4-3）。现在只负责"把话说好 + 通知前端"。
+
+    不打印工单号、不承诺处理时效：没有工单，就没有可承诺的东西。
+    """
+    return {
+        "answer": "已为您转接人工客服，请稍候。人工客服会尽快与您联系。",
+        "actions": [{"type": "transfer_human"}],
+        "is_placeholder": False,
+    }
+
+
+# ── E 出口：三脚本（零模型）──────────────────────────────────
+# 用关键词命中即可，不调模型：闲聊/致谢这类输入不值得一次 LLM 调用，
+# 而且模型可能"过度发挥"，把一句"谢谢"答成一段推销。
+#
+# 局限（本章接受）：纯关键词，遇到"谢谢你，那退货怎么弄"这种**寒暄 + 业务**
+# 的混合句，会靠 `_has_business_intent` 排除脚本、走兜底——比误判成"致谢"好。
+
+_SOCIAL_WORDS = ("在吗", "在不在", "你好", "您好", "hi", "hello", "有人吗")
+_THANKS_WORDS = ("谢谢", "多谢", "谢啦", "感谢", "好的", "好滴", "嗯", "收到", "辛苦了")
+# 出现这些词说明用户在问业务，不能按寒暄/致谢处理
+_BUSINESS_WORDS = (
+    "退", "换", "订单", "物流", "快递", "发票", "优惠券", "券",
+    "会员", "积分", "库存", "多少钱", "价保", "地址",
+)
+
+SOCIAL_REPLY = "在的，请问有什么可以帮您？"
+THANKS_REPLY = "不客气，还有其他可以帮您的吗？"
+UNKNOWN_REPLY = "抱歉，这个问题我暂时没能理解。您可以换个说法，或者点「转人工」由客服跟进。"
+
+
+def _has_business_intent(text: str) -> bool:
+    return any(word in text for word in _BUSINESS_WORDS)
+
+
+def _matches(text: str, words: tuple[str, ...]) -> bool:
+    return any(word in text for word in words)
 
 
 async def fallback_exit(state: ConversationState) -> dict:
-    """E 兜底：Task 8 换成三脚本（闲聊 / 致谢 / 无法处理）。"""
-    return _placeholder("fallback")
+    """E 兜底：闲聊 / 致谢 / 无法处理，三分支。
+
+    顺序有讲究：**先排除业务意图**，再判断寒暄与致谢。
+    否则「谢谢你，那退货怎么弄」会被答成「不客气」。
+    """
+    query = (state.get("resolved_query") or state.get("raw_query") or "").strip()
+
+    if query and not _has_business_intent(query):
+        if _matches(query, _SOCIAL_WORDS):
+            return {"answer": SOCIAL_REPLY, "is_placeholder": False}
+        if _matches(query, _THANKS_WORDS):
+            return {"answer": THANKS_REPLY, "is_placeholder": False}
+
+    return {
+        "answer": UNKNOWN_REPLY,
+        "actions": [{"type": "transfer_human"}],
+        "is_placeholder": False,
+    }

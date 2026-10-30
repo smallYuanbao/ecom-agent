@@ -123,7 +123,9 @@ def build_knowledge_graph() -> CompiledStateGraph:
     graph.add_node("generate", generate)
     graph.add_node("weak_fallback", weak_fallback)
 
-    graph.set_entry_point("retrieve")
+    # 设置起始节点
+    # 也可能是这样 graph.add_edge(START, "retrieve")
+    graph.set_entry_point("retrieve") # 设置起始节点
     graph.add_conditional_edges(
         "retrieve", _gate_edge, {"strong": "generate", "weak": "weak_fallback"}
     )

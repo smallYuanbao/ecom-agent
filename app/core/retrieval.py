@@ -254,6 +254,7 @@ async def search(query: str, *, top_k: int = 5, strategy: Strategy | None = None
     `rrf_score` 仅供排序与调试，**不要拿去和阈值比较**。
     """
     settings = get_settings()
+    # TODO: 先暂定 dense，后续跑数据再做验证
     chosen: Strategy = strategy or settings.retrieval_strategy  # type: ignore[assignment]
 
     if chosen == "bm25":

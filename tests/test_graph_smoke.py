@@ -3,8 +3,8 @@
 **故意不调模型、不查向量库**——这里验证的是"接线对不对"。
 检索质量由 `scripts/eval_retrieval.py` 覆盖，生成质量由 `scripts/eval_knowledge.py`。
 
-知识出口的当前状态：**已实现**（retrieve → gate → generate / weak_fallback），
-其余四个出口仍是占位。
+当前实现进度：`knowledge`（子图）、`human`（转接话术）、`fallback`（三脚本）
+已实现；`data`（Ch04）、`rules`（Ch03）仍是占位。
 """
 import re
 
@@ -14,7 +14,8 @@ from app.graph.build import EXIT_NODES, build_graph
 from app.graph.routing import INTENT_TO_ROUTE
 
 # 已实现的出口：不是占位。其余仍是占位。
-REAL_EXITS = frozenset({"knowledge"})
+# knowledge（Task 7）、human / fallback（Task 8）已实现。
+REAL_EXITS = frozenset({"knowledge", "human", "fallback"})
 PLACEHOLDER_EXITS = frozenset(EXIT_NODES) - REAL_EXITS
 
 STRONG_EVIDENCE = [

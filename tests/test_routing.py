@@ -14,23 +14,14 @@ import re
 import pytest
 
 from app.graph.build import EXIT_NODES
-from app.graph.nodes import (
-    PLACEHOLDER_TEXT,
-    data_exit,
-    fallback_exit,
-    human_exit,
-    knowledge_exit,
-    rules_exit,
-)
+from app.graph.nodes import PLACEHOLDER_TEXT, data_exit, rules_exit
 from app.graph.routing import FALLBACK_ROUTE, INTENT_TO_ROUTE, route_by_intent
 
-# 出口名 → 对应的节点函数（排序固定，便于阅读报告）
-EXIT_FUNCS = {
-    "knowledge": knowledge_exit,
+# **仍处于占位状态的出口** → 节点函数。
+# knowledge（Task 7）、human / fallback（Task 8）已实现，行为由各自的测试文件覆盖。
+PLACEHOLDER_FUNCS = {
     "data": data_exit,
     "rules": rules_exit,
-    "human": human_exit,
-    "fallback": fallback_exit,
 }
 
 
@@ -42,9 +33,10 @@ def test_route_table_covers_exactly_the_exit_nodes():
     assert set(INTENT_TO_ROUTE.values()) == set(EXIT_NODES)
 
 
-def test_placeholder_text_covers_exactly_the_exit_nodes():
-    """占位文案的键 = 出口名，否则 `_placeholder()` 查表会 KeyError。"""
-    assert set(PLACEHOLDER_TEXT) == set(EXIT_NODES)
+def test_placeholder_text_matches_placeholder_impls():
+    """占位文案的键 = 仍占位的出口，否则 `_placeholder()` 查表会 KeyError。"""
+    assert set(PLACEHOLDER_TEXT) == set(PLACEHOLDER_FUNCS)
+    assert set(PLACEHOLDER_TEXT) <= set(EXIT_NODES)
 
 
 def test_twelve_intents_are_covered():
@@ -52,9 +44,12 @@ def test_twelve_intents_are_covered():
     assert len(INTENT_TO_ROUTE) == 12
 
 
-def test_test_helper_maps_every_exit():
-    """测试自己的出口映射也要齐——漏一个，下面的参数化就少测一个出口。"""
-    assert set(EXIT_FUNCS) == set(EXIT_NODES)
+def test_every_exit_has_a_node_function():
+    """五个出口都得有实现（占位也算），否则图上会缺节点。"""
+    from app.graph import build
+
+    graph_nodes = set(build.build_graph().get_graph().nodes)
+    assert set(EXIT_NODES) <= graph_nodes
 
 
 # ── 第二类：分流逻辑 ────────────────────────────────────────────
@@ -84,33 +79,33 @@ def test_unknown_intent_falls_back_instead_of_raising(state):
 # ── 第三类：占位出口的行为 ──────────────────────────────────────
 
 
-@pytest.mark.parametrize("route", sorted(EXIT_NODES))
-async def test_each_exit_speaks_its_own_line(route: str):
-    """五个出口是复制粘贴来的，最怕串行——`rules` 回了 `data` 的话术。"""
-    result = await EXIT_FUNCS[route]({})
+@pytest.mark.parametrize("route", sorted(PLACEHOLDER_FUNCS))
+async def test_each_placeholder_speaks_its_own_line(route: str):
+    """占位出口最怕串行——`rules` 回了 `data` 的话术。"""
+    result = await PLACEHOLDER_FUNCS[route]({})
     assert result["answer"] == PLACEHOLDER_TEXT[route]
 
 
-async def test_exit_answers_are_pairwise_distinct():
-    """五句话互不相同。若两条相同，说明有人复制完忘了改。"""
-    answers = [PLACEHOLDER_TEXT[route] for route in sorted(EXIT_NODES)]
-    assert len(set(answers)) == len(answers) == 5
+def test_placeholder_answers_are_pairwise_distinct():
+    """两条占位话术不能相同，否则说明有人复制完忘了改。"""
+    answers = list(PLACEHOLDER_TEXT.values())
+    assert len(set(answers)) == len(answers)
 
 
-@pytest.mark.parametrize("route", sorted(EXIT_NODES))
-async def test_exits_mark_placeholder_and_offer_transfer(route: str):
+@pytest.mark.parametrize("route", sorted(PLACEHOLDER_FUNCS))
+async def test_placeholders_mark_and_offer_transfer(route: str):
     """占位必须带两个标记：`is_placeholder`（给统计/前端）和转人工动作（给出路）。"""
-    result = await EXIT_FUNCS[route]({})
+    result = await PLACEHOLDER_FUNCS[route]({})
     assert result["is_placeholder"] is True
     assert {"type": "transfer_human"} in result["actions"]
 
 
-@pytest.mark.parametrize("route", sorted(EXIT_NODES))
+@pytest.mark.parametrize("route", sorted(PLACEHOLDER_FUNCS))
 async def test_placeholder_answers_contain_no_digits(route: str):
     """占位文案里一个数字都不许有。
 
     验收要求是"不得出现任何金额"，但比"不出现 元"更严的写法是**不含任何数字**——
     用户看到"退 5 天到账""需 20 元运费"这类占位文案，会当成真实承诺。
     """
-    answer = (await EXIT_FUNCS[route]({}))["answer"]
+    answer = (await PLACEHOLDER_FUNCS[route]({}))["answer"]
     assert not re.search(r"\d", answer), f"{route} 的占位文案含数字：{answer}"
