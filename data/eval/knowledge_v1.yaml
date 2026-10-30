@@ -40,6 +40,7 @@ cases:
     expect_ids:
       - "returns#商品完好的判定"
       - "art-008"                          # 第八条就是"完好标准"的法规原文
+      - "art-007"                          # 试用后贬值可不适用——"试穿"正是这条的判断依据
     expect_points: ["查验", "完好"]
     should_refuse: false
     queries:

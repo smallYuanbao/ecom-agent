@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))  # 允许 `python scripts/eval_retrieval.py` 直接跑
 
 from app.core.eval_set import EvalQuery, load_queries
+from app.core.kb_version import kb_version
 from app.core.retrieval import search
 
 STRATEGIES = ("dense", "bm25", "hybrid")
@@ -90,6 +91,32 @@ def summarize(result: dict, queries: list[EvalQuery]) -> dict:
     }
 
 
+def common_weakness(
+    results: dict[str, dict], queries: list[EvalQuery]
+) -> tuple[list[EvalQuery], list[tuple[EvalQuery, list[str]]]]:
+    """找出「换策略也救不了」的题。
+
+    这是比「哪个策略最好」更有用的角度：**所有策略都失败的题，问题不在策略，
+    而在语料或切分**。参考实现在 E_multi 桶上发现的就是这个——四个策略 MRR
+    全在 0.6 左右，说明跨文档问题需要多块才能回答，调策略没用。
+    """
+    all_fail: list[EvalQuery] = []
+    majority_fail: list[tuple[EvalQuery, list[str]]] = []
+
+    for index, query in enumerate(queries):
+        failed = [
+            strategy
+            for strategy in STRATEGIES
+            if (rank := results[strategy]["ranks"][index]) is None or rank > HIT_AT
+        ]
+        if len(failed) == len(STRATEGIES):
+            all_fail.append(query)
+        elif len(failed) >= 2:
+            majority_fail.append((query, failed))
+
+    return all_fail, majority_fail
+
+
 def discordance(base: dict, other: dict) -> tuple[int, int]:
     """返回 (base 命中而 other 未命中, other 命中而 base 未命中)。
 
@@ -106,9 +133,22 @@ def discordance(base: dict, other: dict) -> tuple[int, int]:
     return a_only, b_only
 
 
-def render(summaries: list[dict], raws: dict[str, dict], n_cases: int) -> str:
+def render(
+    summaries: list[dict],
+    raws: dict[str, dict],
+    n_cases: int,
+    queries: list[EvalQuery],
+) -> str:
+    from datetime import datetime
+
+    all_fail, majority_fail = common_weakness(raws, queries)
     lines = [
         "# 检索策略对比（Ch02 Task 5）",
+        "",
+        (f"> 生成时间：{datetime.now():%Y-%m-%d %H:%M} ｜ "
+         f"语料 kb_version=`{kb_version()}`"),
+        (f"> 规模：{n_cases} 道基础题 / {len(queries)} 条查询 ｜ "
+         f"策略 {len(STRATEGIES)} ｜ 取回 {TOP_K} 条 / 评估前 {HIT_AT} 条"),
         "",
         (f"> 评测集：`data/eval/knowledge_v1.yaml`（{n_cases} 道基础题展开的查询，"
          "拒答题不计入检索指标）"),
@@ -158,6 +198,22 @@ def render(summaries: list[dict], raws: dict[str, dict], n_cases: int) -> str:
         ]
         lines.append(f"| {summary['strategy']} | " + " | ".join(cells) + " |")
 
+    lines += ["", "## 共同短板（换策略也救不了的题）", ""]
+    if not all_fail and not majority_fail:
+        lines.append("无：每个策略失败的地方都不重叠。")
+    else:
+        lines.append(
+            "**所有策略都失败 → 问题不在策略，在语料或切分；"
+            "两个策略失败 → 说明该题依赖某种特定能力。**"
+        )
+        lines.append("")
+        for query in all_fail:
+            lines.append(f"- **全策略失败**：`{query.query}`（{query.bucket}）"
+                         f" 期望 `{' 或 '.join(query.expect_ids)}`")
+        for query, failed in majority_fail:
+            lines.append(f"- {len(failed)}/{len(STRATEGIES)} 失败（{'/'.join(failed)}）："
+                         f"`{query.query}`（{query.bucket}）")
+
     lines += ["", "## 失败样本（这些比总分有用）", ""]
     for summary in summaries:
         if not summary["failures"]:
@@ -186,7 +242,7 @@ async def main() -> int:
         results[strategy] = await evaluate(strategy, queries)
 
     summaries = [summarize(results[s], queries) for s in STRATEGIES]
-    report = render(summaries, results, len({q.case_id for q in queries}))
+    report = render(summaries, results, len({q.case_id for q in queries}), queries)
 
     print()
     print(report)
