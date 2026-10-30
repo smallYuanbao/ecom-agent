@@ -5,16 +5,21 @@
   · L7：每次请求一个 trace_id，贯穿日志
   · C6：chat 接收 client_message_id 用于幂等（后续实现）
 """
-import asyncio
 import json
+import logging
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
+from openai import APITimeoutError
 from pydantic import BaseModel, Field
 
+from app.api.chat import ChatError, run_turn
 from app.config import get_settings, validate_or_die
 from app.core.logging import new_trace_id, setup_logging, trace_id_var
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -63,12 +68,35 @@ async def meta() -> dict:
 
 @app.post("/api/chat")
 async def chat(req: ChatRequest) -> StreamingResponse:
-    """流式对话骨架。P3 起由状态机接管。"""
+    """跑一轮对话，以 SSE 输出。
+
+    帧顺序：`ack → route → delta → citations → actions → done`；
+    异常时用 `error` 帧替换后续内容。
+
+    **不把内部异常信息透给用户**——只给一句标准话术，细节进日志（带 trace_id）。
+    """
+    trace_id = trace_id_var.get()
+
     async def event_stream():
-        yield _sse({"event": "ack"})
-        for ch in f"（骨架）收到：{req.message}":
-            await asyncio.sleep(0.005)
-            yield _sse({"delta": ch})
-        yield _sse({"event": "done"})
+        try:
+            async for frame in run_turn(req.message, req.conversation_id, trace_id):
+                yield _sse(frame)
+        except ChatError as exc:
+            # 校验类错误：可以告诉用户具体原因
+            yield _sse({"event": "error", "code": exc.code, "message": exc.message})
+        except (TimeoutError, httpx.TimeoutException, APITimeoutError):
+            logger.warning("对话超时", exc_info=True)
+            yield _sse({
+                "event": "error",
+                "code": "timeout",
+                "message": "服务响应超时，请稍后重试或转人工。",
+            })
+        except Exception:
+            logger.exception("对话失败")
+            yield _sse({
+                "event": "error",
+                "code": "internal_error",
+                "message": "服务暂时不可用，请稍后重试或转人工。",
+            })
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
