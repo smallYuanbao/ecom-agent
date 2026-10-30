@@ -3,6 +3,7 @@
 最要紧的一条：**每条 expect_id 必须能在当前语料里找到**。
 语料一改（改小节名、删一节），评测集就会悄悄失效——测试不报错，只是命中率莫名掉。
 """
+import re
 from collections import Counter
 
 import pytest
@@ -67,7 +68,31 @@ def test_buckets_cover_the_corpus_areas():
 
 
 @pytest.mark.parametrize("case", load_cases(), ids=lambda c: c.id)
-def test_expect_points_are_non_empty_for_answerable_cases(case):
+def test_every_scorable_query_has_points(case):
+    """参与覆盖统计的查询必须标要点，否则覆盖率会把它当成 0/0 混进分母。
+
+    要点在 **query 级**（不是 case 级）：同一道题的不同问法问的是不同细节，
+    标在 case 级会让「FB-30 保修多久」被要求包含「洗碗机」。
+    """
     if case.should_refuse:
         return
-    assert case.expect_points, f"{case.id} 没有 expect_points，生成侧无法判断答案对不对"
+    for item in case.queries:
+        if item.get("skip_coverage"):
+            continue
+        assert item.get("points"), f"{case.id} / {item['q']} 缺 points"
+
+
+def test_skip_coverage_queries_have_no_points():
+    """声明"不统计覆盖"的查询不该再标要点——两种意图不能混。"""
+    for case in load_cases():
+        for item in case.queries:
+            if item.get("skip_coverage"):
+                assert not item.get("points"), f"{case.id} / {item['q']} 既跳过覆盖又标了要点"
+
+
+def test_points_are_valid_regex():
+    """要点写成正则（同义说法很多），写错会在评测时静默不匹配。"""
+    for case in load_cases():
+        for item in case.queries:
+            for pattern in item.get("points") or []:
+                re.compile(pattern)

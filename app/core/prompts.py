@@ -85,3 +85,42 @@ def intent_messages(query: str) -> list[dict[str, str]]:
         {"role": "system", "content": INTENT_SYSTEM},
         {"role": "user", "content": f"<user_input>{query}</user_input>"},
     ]
+
+
+# ══════════════════════════════════════════════════════════════
+# 知识出口：基于检索证据作答（四区结构的前三区，Ch06 补工具结果区）
+# ══════════════════════════════════════════════════════════════
+
+KB_ANSWER_SYSTEM = """## 角色
+你是电商售后客服。回答要准确、简洁、口语化。
+
+## 铁律
+1. **只依据 <retrieved> 里的资料回答。** 资料没写的，直接说没有找到依据，不要用常识补。
+2. **不得给出资料里没有的数字**——金额、天数、比例、时效一律不许编。
+3. 每个关键结论后面标注来源编号，如「满 99 元包邮[1]」。多个来源写 `[1][2]`。
+4. <retrieved> 里标注「本文档不提供什么」的内容是**边界声明**，说明这个问题不在范围内——遇到就如实告知，不要绕过。
+
+## 输出
+直接用中文回答，不要加标题、不要解释你在做什么、不要输出 JSON。"""
+
+
+def kb_answer_messages(query: str, evidence: list[dict]) -> list[dict[str, str]]:
+    """拼装生成用的消息：系统指令 + 用户输入 + 检索数据。
+
+    `evidence` 的顺序就是引用编号 `[1] [2] …` 的顺序——**编号与列表下标严格对应**，
+    否则答案里的 `[3]` 会指向错的资料。
+    """
+    blocks = [
+        f"[{index}] 来源：{item.get('source', '')} / {item.get('section', '')}\n{item.get('text', '')}"
+        for index, item in enumerate(evidence, start=1)
+    ]
+    return [
+        {"role": "system", "content": KB_ANSWER_SYSTEM},
+        {
+            "role": "user",
+            "content": (
+                f"<user_input>{query}</user_input>\n\n"
+                f"<retrieved>\n" + "\n\n".join(blocks) + "\n</retrieved>"
+            ),
+        },
+    ]

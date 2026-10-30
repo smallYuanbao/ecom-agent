@@ -28,9 +28,9 @@ class EvalCase:
     id: str
     bucket: str
     expect_ids: list[str]          # 任一命中即算对；should_refuse 时为空
-    expect_points: list[str]       # 答案里必须出现的字面要点
+    expect_points: list[str]       # 兜底要点（query 级没写时才用）
     should_refuse: bool
-    queries: list[dict[str, str]]  # [{"q": "...", "style": "formal"}]
+    queries: list[dict[str, Any]]  # [{"q": ..., "style": ..., "points": [...], "skip_coverage": bool}]
 
     @property
     def query_texts(self) -> list[str]:
@@ -46,7 +46,8 @@ class EvalQuery:
     style: str
     query: str
     expect_ids: list[str]
-    expect_points: list[str]
+    expect_points: list[str]       # **这一问的**答案要点（query 级）
+    skip_coverage: bool            # 命中哪块合理资料都对、答案内容不同 → 不计覆盖
     should_refuse: bool
 
 
@@ -81,7 +82,9 @@ def load_queries(path: Path | None = None) -> list[EvalQuery]:
                     style=item["style"],
                     query=item["q"],
                     expect_ids=case.expect_ids,
-                    expect_points=case.expect_points,
+                    # 要点优先取 query 级的：同一个 case 的不同问法问的不是同一件事
+                    expect_points=list(item.get("points") or case.expect_points),
+                    skip_coverage=bool(item.get("skip_coverage", False)),
                     should_refuse=case.should_refuse,
                 )
             )

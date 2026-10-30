@@ -1,17 +1,23 @@
 """主图：resolve_reference → classify_intent → 按意图分流到五个出口。
 
-本章五个出口全是占位（明确告知"开发中"），后续章节逐个替换函数体，
-**节点名与边一个都不改**——这就是"行走骨架"：接口和形状先立住，实现后补。
+出口的实现进度：
+
+| 出口 | 状态 |
+|---|---|
+| `knowledge` | ✅ 真实子图（retrieve → gate → generate / weak_fallback） |
+| `data` / `rules` / `human` / `fallback` | 占位（明确告知"开发中"） |
+
+**节点名与边一个都不改**——这就是"行走骨架"：形状先立住，函数体逐章替换。
 """
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
+from app.graph.knowledge import build_knowledge_graph
 from app.graph.nodes import (
     classify_intent,
     data_exit,
     fallback_exit,
     human_exit,
-    knowledge_exit,
     resolve_reference,
     rules_exit,
 )
@@ -28,7 +34,7 @@ def build_graph() -> CompiledStateGraph:
 
     g.add_node("resolve_reference", resolve_reference)   # Ch05 换真实实现
     g.add_node("classify_intent", classify_intent)       # Task 2 换成真实分类
-    g.add_node("knowledge", knowledge_exit)              # Task 7 换成知识子图
+    g.add_node("knowledge", build_knowledge_graph())     # 编译后的子图可直接当节点
     g.add_node("data", data_exit)                        # Ch04 换成真实查询
     g.add_node("rules", rules_exit)                      # Ch03 换成 8 状态流水线
     g.add_node("human", human_exit)                      # Task 8 换成真实话术

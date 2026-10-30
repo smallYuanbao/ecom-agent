@@ -85,3 +85,23 @@ async def structured_call(
             continue
 
     raise last_error or LLMFormatError("结构化调用失败")
+
+
+async def chat(
+    messages: list[dict[str, str]],
+    *,
+    temperature: float = 0.2,
+) -> str:
+    """普通文本生成（不强制结构化）。返回模型输出的正文。
+
+    与 `structured_call` 的区别：这里要的是一段自然语言回答，不是 JSON。
+    **不重试**——生成失败通常是服务问题（超时/限流/鉴权），重试只是把
+    同一个错误延迟一次；由 API 层统一回 `error` 帧更清楚。
+    """
+    client = get_client()
+    response = await client.chat.completions.create(
+        model=get_settings().chat_model,
+        messages=messages,
+        temperature=temperature,
+    )
+    return response.choices[0].message.content or ""

@@ -1,16 +1,21 @@
-# Ch02 检索小评测集 v1
+# Ch02 检索与知识出口评测集 v2
 #
-# 设计：15 道「基础题」× 每题 3 种问法 = 45 条查询。
-#   - 换问法只改 query，**不改答案** —— 用它测口语化/同义表达的召回衰减
-#   - expect_id 指向 chunk id（`{文件}#{小节}` 或 `art-XXX`），可精确断言
-#   - expect_points 是答案里必须出现的字面要点，供生成侧检查（Task 7 用）
+# 设计：15 道「基础题」（case），每题 3 种问法，共 45 条查询。
 #
-# 为什么不写 100 条：语料只有 40 个 chunk，样本/语料比过高会过拟合——
+#   - `expect_ids`（case 级）：正确答案是哪块资料，**换问法不变**
+#   - `points`（**query 级**）：这一问的答案必须包含什么，**写正则**
+#     因为同一个意思有几种说法（「不可叠加」/「不能叠加」、「可登机」/「能登机」），
+#     字面子串匹配会把正确答案判成缺要点
+#     v1 把它标在 case 级，结果「FB-30 保修多久」被要求包含「洗碗机」——
+#     那是同一道题另一个问法的要点。**问法不同，问的细节就不同。**
+#   - `skip_coverage: true`：不参与要点覆盖统计。这类查询命中哪块合理资料
+#     都对，但答案内容不同（如「试穿过了还能退吗」命中「完好判定」或 art-007 都算对）
+#   - `style`：formal / colloquial / multi，用于分析口语化的召回衰减
+#
+# 为什么不写 100 条：语料只有 41 个 chunk，样本/语料比过高会过拟合——
 # 调阈值时容易"记住这 45 条"。策略比较等 Ch07 扩到 100+ 再做。
-#
-# style 取值：formal（书面）/ colloquial（口语）/ multi（多要素组合）
 
-version: v1
+version: v2
 cases:
   # ── 政策 ────────────────────────────────────────────────
   - id: P1
@@ -18,22 +23,20 @@ cases:
     expect_ids:
       - "returns#七日无理由退货的适用范围"
       - "returns#不适用无理由退货的商品"   # 同属"退货政策"，两节都算对
-    expect_points: ["7 个自然日", "签收次日"]
     should_refuse: false
     queries:
-      - {q: "退货政策是什么", style: formal}
-      - {q: "买回来不想要了还能退吗", style: colloquial}
-      - {q: "七天无理由是从哪天开始算的", style: formal}
+      - {q: "退货政策是什么", style: formal, skip_coverage: true}
+      - {q: "买回来不想要了还能退吗", style: colloquial, points: ["7 ?个?自然日|七日"]}
+      - {q: "七天无理由是从哪天开始算的", style: formal, points: ["签收次日|签收的?次日|签收后第二天"]}
 
   - id: P2
     bucket: policy
     expect_ids: ["returns#退货运费由谁承担"]
-    expect_points: ["质量问题", "12 元"]
     should_refuse: false
     queries:
-      - {q: "退货运费由谁承担", style: formal}
-      - {q: "退货的快递费谁出", style: colloquial}
-      - {q: "质量有问题退回去的运费算谁的", style: colloquial}
+      - {q: "退货运费由谁承担", style: formal, points: ["质量问题", "消费者承担|买家承担"]}
+      - {q: "退货的快递费谁出", style: colloquial, points: ["质量问题", "消费者承担|买家承担"]}
+      - {q: "质量有问题退回去的运费算谁的", style: colloquial, points: ["商家承担|卖家承担"]}
 
   - id: P3
     bucket: policy
@@ -41,133 +44,119 @@ cases:
       - "returns#商品完好的判定"
       - "art-008"                          # 第八条就是"完好标准"的法规原文
       - "art-007"                          # 试用后贬值可不适用——"试穿"正是这条的判断依据
-    expect_points: ["查验", "完好"]
     should_refuse: false
     queries:
-      - {q: "商品完好的标准是什么", style: formal}
-      - {q: "拆了包装还能算完好么", style: colloquial}
-      - {q: "试穿过了还能退吗", style: colloquial}
+      - {q: "商品完好的标准是什么", style: formal, points: ["查验", "完好"]}
+      - {q: "拆了包装还能算完好么", style: colloquial, points: ["查验", "完好"]}
+      - {q: "试穿过了还能退吗", style: colloquial, skip_coverage: true}
 
   - id: P4
     bucket: policy
-    # 反向用例：看起来像该拒答，其实语料里有答案（港澳台及海外不发货）
     expect_ids: ["shipping#包邮门槛"]
-    expect_points: ["99 元", "199 元"]
     should_refuse: false
     queries:
-      - {q: "多少钱包邮", style: formal}
-      - {q: "能寄到国外吗", style: formal}
-      - {q: "西藏发货要加钱吗", style: colloquial}
+      - {q: "多少钱包邮", style: formal, points: ["99\\s*元"]}
+      - {q: "能寄到国外吗", style: formal, points: ["海外|港澳台", "不发货"]}
+      - {q: "西藏发货要加钱吗", style: colloquial, points: ["199\\s*元"]}
 
   - id: P5
     bucket: policy
     expect_ids: ["shipping#运费险"]
-    expect_points: ["12 元", "上门取件"]
     should_refuse: false
     queries:
-      - {q: "运费险怎么赔", style: formal}
-      - {q: "退货运费险能赔多少", style: formal}
-      - {q: "自己寄回去运费险给报吗", style: colloquial}
+      - {q: "运费险怎么赔", style: formal, points: ["12\\s*元"]}
+      - {q: "退货运费险能赔多少", style: formal, points: ["12\\s*元"]}
+      - {q: "自己寄回去运费险给报吗", style: colloquial, points: ["上门取件"]}
 
   - id: P6
     bucket: policy
     expect_ids: ["invoice#开票时间限制"]
-    expect_points: ["30 天", "24 小时"]
     should_refuse: false
     queries:
-      - {q: "什么时候能开发票", style: formal}
-      - {q: "买了两个月还能补开发票吗", style: colloquial}
-      - {q: "电子发票多久能开出来", style: formal}
+      - {q: "什么时候能开发票", style: formal, points: ["30\\s*天"]}
+      - {q: "买了两个月还能补开发票吗", style: colloquial, points: ["30\\s*天"]}
+      - {q: "电子发票多久能开出来", style: formal, points: ["24\\s*小时"]}
 
   - id: P7
     bucket: policy
     expect_ids: ["member#各等级的权益"]
-    expect_points: ["98 折", "95 折"]
     should_refuse: false
     queries:
-      - {q: "会员有什么折扣", style: formal}
-      - {q: "金卡能便宜多少", style: colloquial}
-      - {q: "银卡和金卡有什么区别", style: formal}
+      - {q: "会员有什么折扣", style: formal, points: ["98\\s*折", "95\\s*折"]}
+      - {q: "金卡能便宜多少", style: colloquial, points: ["95\\s*折"]}
+      - {q: "银卡和金卡有什么区别", style: formal, points: ["98\\s*折", "95\\s*折"]}
 
   - id: P8
     bucket: policy
     expect_ids: ["promo#叠加规则"]
-    expect_points: ["不可叠加", "会员折扣"]
     should_refuse: false
     queries:
-      - {q: "优惠券能叠加使用吗", style: formal}
-      - {q: "两张券能一起用不", style: colloquial}
-      - {q: "优惠券和会员折扣能同时用吗", style: multi}
+      - {q: "优惠券能叠加使用吗", style: formal, points: ["不可叠加|不能叠加|只能使用一张"]}
+      - {q: "两张券能一起用不", style: colloquial, points: ["不可叠加|不能叠加|只能使用一张"]}
+      - {q: "优惠券和会员折扣能同时用吗", style: multi, points: ["会员折扣"]}
 
   # ── 商品规格（型号精确命中，BM25 的主场）────────────────────
   - id: S1
     bucket: spec
     expect_ids: ["products#婴儿推车 ST-20 轻便伞车"]
-    expect_points: ["15kg", "可登机"]
     should_refuse: false
     queries:
-      - {q: "ST-20 能带上飞机吗", style: formal}
-      - {q: "这个伞车能登机不", style: colloquial}
-      - {q: "ST-20 最多能坐多少斤的孩子", style: formal}
+      - {q: "ST-20 能带上飞机吗", style: formal, points: ["可登机|能登机"]}
+      - {q: "这个伞车能登机不", style: colloquial, points: ["可登机|能登机"]}
+      - {q: "ST-20 最多能坐多少斤的孩子", style: formal, points: ["15\\s*kg"]}
 
   - id: S2
     bucket: spec
     expect_ids: ["products#儿童安全座椅 CS-04"]
-    expect_points: ["反向", "13kg"]
     should_refuse: false
     queries:
-      - {q: "CS-04 可以反向安装吗", style: formal}
-      - {q: "新生儿的安全座椅能反向到多少公斤", style: colloquial}
-      - {q: "CS-04 反向安装的最大体重是多少", style: formal}
+      - {q: "CS-04 可以反向安装吗", style: formal, points: ["13\\s*kg"]}
+      - {q: "新生儿的安全座椅能反向到多少公斤", style: colloquial, points: ["13\\s*kg"]}
+      - {q: "CS-04 反向安装的最大体重是多少", style: formal, points: ["13\\s*kg"]}
 
   - id: S3
     bucket: spec
     expect_ids: ["products#辅食机 FB-30"]
-    expect_points: ["洗碗机", "24 个月"]
     should_refuse: false
     queries:
-      - {q: "FB-30 能进洗碗机吗", style: formal}
-      - {q: "辅食机哪个保修时间长", style: colloquial}
-      - {q: "FB-30 保修多久", style: formal}
+      - {q: "FB-30 能进洗碗机吗", style: formal, points: ["洗碗机"]}
+      - {q: "辅食机哪个保修时间长", style: colloquial, points: ["24\\s*个月"]}
+      - {q: "FB-30 保修多久", style: formal, points: ["24\\s*个月"]}
 
   # ── 法规（引用要能对上条号）──────────────────────────────
   - id: R1
     bucket: regulation
     expect_ids: ["art-006"]
-    expect_points: ["定作", "音像制品"]
     should_refuse: false
     queries:
-      - {q: "哪些商品不适用七天无理由退货", style: formal}
-      - {q: "拆封的音像制品能退吗", style: formal}
-      - {q: "定做的商品能退不", style: colloquial}
+      - {q: "哪些商品不适用七天无理由退货", style: formal, points: ["定作|定制", "音像制品"]}
+      - {q: "拆封的音像制品能退吗", style: formal, points: ["音像制品"]}
+      - {q: "定做的商品能退不", style: colloquial, points: ["定作|定制"]}
 
   - id: R2
     bucket: regulation
     expect_ids: ["art-010"]
-    expect_points: ["次日", "七日"]
     should_refuse: false
     queries:
-      - {q: "七天无理由的起算时间", style: formal}
-      - {q: "七日是从签收当天算还是第二天", style: formal}
-      - {q: "这个七天怎么数", style: colloquial}
+      - {q: "七天无理由的起算时间", style: formal, points: ["次日"]}
+      - {q: "七日是从签收当天算还是第二天", style: formal, points: ["次日"]}
+      - {q: "这个七天怎么数", style: colloquial, points: ["次日"]}
 
   - id: R3
     bucket: regulation
     expect_ids:
       - "art-012"
       - "returns#赠品与各类优惠形式的处理"  # 平台细则复述了同一条规则
-    expect_points: ["赠品", "一并退回"]
     should_refuse: false
     queries:
-      - {q: "退货的时候赠品要一起退吗", style: formal}
-      - {q: "赠品不退回会怎么样", style: formal}
-      - {q: "送的东西也要寄回去吗", style: colloquial}
+      - {q: "退货的时候赠品要一起退吗", style: formal, points: ["赠品"]}
+      - {q: "赠品不退回会怎么样", style: formal, points: ["赠品"]}
+      - {q: "送的东西也要寄回去吗", style: colloquial, points: ["赠品"]}
 
   # ── 该拒答（语料里确实没有）──────────────────────────────
   - id: N1
     bucket: refuse
     expect_ids: []
-    expect_points: []
     should_refuse: true
     queries:
       - {q: "你们卖不卖二手推车", style: formal}
