@@ -112,27 +112,70 @@ async def main() -> int:
 
     gate_pass_rate = a_pass / len(answerable) if answerable else 0
     leak_rate = (r_pass + o_pass) / (len(refusable) + len(OUT_OF_DOMAIN))
-    lines += [
-        "",
-        "## 阈值扫描（同一批分数，只改比较的门槛）",
-        "",
-        "| 阈值 | 可答题放行 | 该拒答+域外拦住 | 说明 |",
-        "|---|---|---|---|",
-    ]
-    for candidate in (0.45, 0.50, 0.53, 0.55, 0.58, 0.62, 0.66):
+    total_negative = len(refusable) + len(OUT_OF_DOMAIN)
+    candidates = sorted({sim for _, _, sim, _ in scored}, reverse=True)
+
+    def outcome(candidate: float) -> tuple[int, int]:
         kept = sum(1 for kind, _, sim, _ in scored if kind == "可答题" and sim >= candidate)
         blocked = sum(
             1 for kind, _, sim, _ in scored if kind != "可答题" and sim < candidate
         )
-        total_negative = len(refusable) + len(OUT_OF_DOMAIN)
-        note = ""
-        if candidate == threshold:
-            note = "**当前**"
-        elif candidate <= 0.50:
-            note = "太松：拒答题也会被放行"
-        elif candidate >= 0.62:
-            note = "太严：可答题开始被误拦"
-        lines.append(f"| {candidate} | {kept}/{len(answerable)} | {blocked}/{total_negative} | {note} |")
+        return kept, blocked
+
+    lines += [
+        "",
+        "## 阈值怎么定：只有两个真正不同的结果",
+        "",
+        ("> 阈值只有在**跨过某个观测分数**时才改变行为。把 45+8 条样本的 top1 分数"
+         "排序后挨个试，结果只有下面这些——除此之外的阈值行为完全相同。"),
+        "",
+        "### 负样本的分数（决定能拦住几条）",
+        "",
+        "| 负样本分数 | 低于它的拦住数 | 样本 |",
+        "|---|---|---|",
+    ]
+    for kind, query, sim, _ in sorted(
+        (r for r in scored if r[0] != "可答题"), key=lambda r: -r[2]
+    ):
+        below = sum(1 for k, _, s2, _ in scored if k != "可答题" and s2 < sim)
+        lines.append(f"| {sim:.3f} | {below}/{total_negative} | ⛔ {query} |")
+
+    options = [(c, *outcome(c)) for c in candidates]
+    frontier = [
+        o for o in options
+        if not any(
+            b[1] >= o[1] and b[2] >= o[2] and (b[1] > o[1] or b[2] > o[2])
+            for b in options
+        )
+    ]
+    lines += [
+        "",
+        "### Pareto 前沿（没有更优解）",
+        "",
+        "| 阈值 | 可答题放行 | 负样本拦住 | 代价 |",
+        "|---|---|---|---|",
+    ]
+    for candidate, kept, blocked in sorted(frontier):
+        cost = "不用代价" if kept == len(answerable) else f"少答 {len(answerable) - kept} 条"
+        mark = ""
+        if outcome(threshold) == (kept, blocked):
+            mark = " **← 当前阈值落在这个区间**"
+        lines.append(
+            f"| {candidate:.3f} | {kept}/{len(answerable)} | {blocked}/{total_negative} "
+            f"| {cost}{mark} |"
+        )
+
+    same_as = next((o for o in frontier if (o[1], o[2]) == outcome(threshold)), None)
+    lines += [
+        "",
+        (f"**当前阈值 {threshold} 与 {same_as[0]:.3f} 行为完全相同**——"
+         "它落在两个相邻观测分数之间，微调没有任何区别。"
+         if same_as else f"**当前阈值 {threshold} 在前沿之外**。"),
+        "",
+        ("要改变行为，必须跨过前沿里那两个分数（"
+         + " / ".join(f"{o[0]:.3f}" for o in sorted(frontier)) + "），"
+         "在它们之间怎么调都一样。"),
+    ]
 
     lines += [
         "",
