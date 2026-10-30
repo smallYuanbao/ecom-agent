@@ -14,7 +14,7 @@
 | 6 | 2026-10-30 | 证据闸与兜底落池 | `b7fd2fa` |
 | 7 | 2026-10-31 | 知识出口子图 | `75b6720` |
 | 8 | 2026-10-31 | D / E 出口 | `046d63d` |
-| 9 | | `/api/chat` 接图 + trace | |
+| 9 | 2026-10-31 | `/api/chat` 接图 + trace | `99fd990` |
 | 10 | | 验收 | |
 
 ---
@@ -467,3 +467,74 @@ if query and not _has_business_intent(query):
 - `uv run pytest tests/test_human_fallback.py -q` → 21 passed
 - `uv run pytest -q` → **216 passed**
 - 真实链路：`在吗` → 社交话术；`谢谢` → 致谢话术；`你们这什么破服务` → 转人工 + 动作
+
+---
+
+## 9 · `/api/chat` 接图 + trace（`99fd990`）
+
+### 新增
+
+| 文件 | 内容 |
+|---|---|
+| `app/api/chat.py` | `ChatError` / `run_turn()`（逐帧产出的异步生成器） |
+| `app/core/tracer.py` | `record_span()` / `new_span_id()` |
+| `tests/test_chat_sse.py` | 15 条：帧顺序 / trace / 入参校验 / HTTP 层错误映射 |
+
+### 修改与原因
+
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+|---|---|---|---|
+| `main.py` · `/api/chat` | 逐字符回显"（骨架）收到：…" | 调 `run_turn()`，按帧推送 | 骨架只证明 SSE 能通，接不上真实链路 |
+| `main.py` · 异常处理 | 无 | `ChatError` → 原样透出；超时/未预期 → 固定话术 | 把异常堆栈或内部信息透给用户，既泄露实现细节又帮不上忙 |
+| `tracer.py` · `turn:total` 的 `start_at` | 取"最后一个节点结束的时刻" | 取轮次起点 | 实测总耗时显示 5ms，而节点加起来 900ms+——**计时口径错了，数字就是假的** |
+
+### 三个设计决定
+
+**① 用 `astream` 而不是 `ainvoke`**
+
+`stream_mode="updates"` 每个节点跑完就吐一次。好处是 **`route` 帧能在分类完成时立刻发出**，
+前端可以马上显示"正在查知识库"，不用等十几秒生成完才看到分流结果。
+
+**② trace 写失败不影响对话**
+
+```python
+except Exception:
+    logger.warning("写入 trace_span 失败", exc_info=True)
+```
+
+追踪是观测手段，不是业务依赖。数据库写不进去时宁可丢一条 span，也不能让用户这轮对话失败。
+
+**③ HTTP 层加一个 D9 之外的兜底码**
+
+D9 的四类（`not_found` / `forbidden` / `timeout` / `invalid_arg`）是**给模型看的工具错误语义**。
+传输层还需要 `internal_error` 接住未预期异常——已在 `chat.py` 的 docstring 里写明这是扩展，不是遗漏。
+
+### 实测（uvicorn :8080）
+
+```
+POST {"message":"退货政策是什么"}
+  ack → route=knowledge → citations×5 → done
+
+POST {"message":"我这单能退多少"}
+  ack → route=rules → actions=[transfer_human] → done
+  响应正文：「退费核算正在开发中，您可以先转人工处理。」（含金额？False）
+
+POST {"message":"你们这什么破服务"}
+  ack → route=human → actions=[transfer_human] → done
+```
+
+trace（一次请求，同一 `trace_id`）：
+
+| span | 耗时 |
+|---|---|
+| `node:resolve_reference` | 2 ms |
+| `node:classify_intent` | 907 ms |
+| `node:rules` | 4 ms |
+| `turn:total` | 917 ms |
+
+**节点之和 ≈ 总耗时**，说明计时口径一致。
+
+### 验证
+- `uv run pytest -q` → **231 passed**
+- 端到端三条 curl 全部符合预期
+- `sqlite3 data/app.db "select trace_id, name from trace_span ..."` → 每次请求 4 行、trace_id 一致
