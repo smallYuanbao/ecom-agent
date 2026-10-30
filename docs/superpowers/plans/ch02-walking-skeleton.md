@@ -502,6 +502,9 @@ async def run_turn(message: str, conversation_id: int | None, trace_id: str) -> 
 - [ ] `/api/meta` 返回 `kb_version`
 - [ ] 更新 `00-tasks.md` 对应勾选
 - [ ] 记录意图分类的实际准确率（供 Ch04 调边界用）
+- [ ] **迷你质量传导表**：15 道题上把「检索是否命中」×「答案是否含 expect_points」列成 2×2，
+      人工核验「**检索未命中但答案完整**」的那几条——那是编造风险最高的地方（Ch06 重点）
+- [ ] 该表写入 `docs/reports/`，作为 P7-7 的第一次数据点
 
 **Commit:** `test: Ch02 验收（骨架 + 知识出口 + 占位）`
 
