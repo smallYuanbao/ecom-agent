@@ -35,14 +35,30 @@ Strategy = Literal["dense", "bm25", "hybrid"]
 _CODE_RE = re.compile(r"[a-z]+-\d+[a-z]?", re.IGNORECASE)
 _NUM_RE = re.compile(r"\d+(?:\.\d+)?")
 
-# 领域词：不加的话「无理由」「运费险」会被切碎
-_DOMAIN_WORDS = (
-    "退货", "退款", "运费", "包邮", "运费险", "无理由", "价保", "补差价",
-    "订单变更", "辅食机", "安全座椅", "婴儿推车", "洗碗机", "保修",
+# 领域词：**直接抽取，不交给 jieba**。
+#
+# 原因：jieba 遇到「多少钱包邮」会切成 `多少 / 钱包 / 邮`——「钱包」把「包邮」吃掉了。
+# `add_word` 和 `suggest_freq` 都压不住（实测过），因为这是最大概率路径问题。
+# 所以这里先按字面整词抽出来，剩下的文本再交给 jieba。
+_DOMAIN_TERMS = tuple(
+    sorted(
+        (
+            "运费险", "无理由", "包邮", "运费", "退货", "退款", "价保", "补差价",
+            "订单变更", "辅食机", "安全座椅", "婴儿推车", "洗碗机", "保修",
+            "七天", "赠品", "发票", "会员", "积分", "优惠券", "叠加",
+        ),
+        key=len,
+        reverse=True,  # 长词优先，避免「运费险」被「运费」抢先匹配
+    )
 )
 
-for _word in _DOMAIN_WORDS:
-    jieba.add_word(_word)
+# 停用词：不滤掉的话，「多少钱包邮」会靠「多少」「钱」命中
+# `本文档不提供什么` 这类短块，把真正相关的 `包邮门槛` 压到第 4 名。
+# 只放纯功能词与通用疑问词，不动任何可能承载语义的词。
+_STOPWORDS = frozenset(
+    "的 了 吗 呢 吧 啊 是 有 能 可以 怎么 怎样 什么 多少 哪 哪个 我 你 您 他 这 那 就 要 "
+    "会 在 和 与 及 也 都 很 更 最 个 一个 一下 请问 想问 帮我 看看".split()
+)
 
 _collection_id: str | None = None
 
@@ -58,10 +74,18 @@ def tokenize(text: str) -> list[str]:
     """
     lowered = text.lower()
     codes = _CODE_RE.findall(lowered)
-    without_codes = _CODE_RE.sub(" ", lowered)
-    numbers = _NUM_RE.findall(without_codes)
-    residue = _NUM_RE.sub(" ", without_codes)
-    return codes + numbers + [t for t in jieba.lcut_for_search(residue) if t.strip()]
+    residue = _CODE_RE.sub(" ", lowered)
+
+    terms: list[str] = []
+    for term in _DOMAIN_TERMS:
+        if term in residue:
+            terms.append(term)
+            residue = residue.replace(term, " ")
+
+    numbers = _NUM_RE.findall(residue)
+    residue = _NUM_RE.sub(" ", residue)
+    words = [t for t in jieba.lcut_for_search(residue) if t.strip() and t not in _STOPWORDS]
+    return codes + terms + numbers + words
 
 
 # ── 基础设施 ──────────────────────────────────────────────────

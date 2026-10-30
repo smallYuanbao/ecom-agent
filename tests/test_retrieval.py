@@ -32,10 +32,18 @@ requires_services = pytest.mark.skipif(
         ("CS-04L 加长款", "cs-04l"),          # 带后缀字母的型号
         ("满 99 元包邮", "99"),               # 数字单独成词
         ("退货运费由谁承担", "运费"),          # 领域词不被切碎
+        ("多少钱包邮", "包邮"),              # 「钱包」曾把「包邮」吃掉
+        ("这个七天怎么数", "七天"),
     ],
 )
 def test_tokenize_keeps_key_terms(text: str, must_have: str):
     assert must_have in tokenize(text), f"{text!r} 分词后丢了 {must_have!r}"
+
+
+def test_tokenize_drops_stopwords():
+    """通用疑问词要滤掉，否则短块靠「多少」「钱」就能命中。"""
+    assert "多少" not in tokenize("多少钱包邮")
+    assert "包邮" in tokenize("多少钱包邮")
 
 
 def test_tokenize_does_not_duplicate_code_digits():

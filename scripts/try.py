@@ -47,9 +47,25 @@ async def run_graph(text: str) -> None:
         print(f"  actions={result['actions']}")
 
 
+async def run_retrieve(text: str, strategy: str | None = None) -> None:
+    """只跑检索：看 top5 命中、相似度与排名，用于排查"为什么这条没召回到"。"""
+    from app.config import get_settings
+    from app.core.retrieval import search
+
+    chosen = strategy or get_settings().retrieval_strategy
+    hits = await search(text, top_k=5, strategy=chosen)  # type: ignore[arg-type]
+    print(f"  strategy={chosen}")
+    for rank, hit in enumerate(hits, start=1):
+        print(
+            f"  {rank}. {hit['id']:<34} "
+            f"similarity={hit['similarity']:.3f}  rrf={hit['rrf_score']:.4f}"
+        )
+
+
 MODES = {
     "intent": run_intent,
     "graph": run_graph,
+    "retrieve": run_retrieve,
 }
 
 
@@ -57,14 +73,19 @@ async def main() -> int:
     parser = argparse.ArgumentParser(description="手动试跑（跟着 task 验收用）")
     parser.add_argument("mode", choices=sorted(MODES), help="跑哪一层")
     parser.add_argument("text", nargs="*", help="要试的句子；不传则进入交互模式")
+    parser.add_argument(
+        "-s", "--strategy", choices=("dense", "bm25", "hybrid"),
+        help="仅 retrieve 模式：指定检索策略（默认取配置）",
+    )
     args = parser.parse_args()
-
-    runner = MODES[args.mode]
 
     if args.text:
         text = " ".join(args.text)
         print(f"[{args.mode}] {text!r}")
-        await runner(text)
+        if args.mode == "retrieve":
+            await run_retrieve(text, args.strategy)
+        else:
+            await MODES[args.mode](text)
         return 0
 
     # 交互模式：逐行读，空行退出
@@ -74,7 +95,10 @@ async def main() -> int:
         if not text:
             break
         print(f"> {text!r}")
-        await runner(text)
+        if args.mode == "retrieve":
+            await run_retrieve(text, args.strategy)
+        else:
+            await MODES[args.mode](text)
     return 0
 
 
