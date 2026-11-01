@@ -1,0 +1,506 @@
+{
+  "_comment": "expected 由人工填写，格式：{eligible: bool, reason_code: str} 或 {needs_human: true}。标注标准见 docs/design/电商客服-退款评测标注规则.md",
+  "_now": "2026-11-05T10:00:00",
+  "cases": [
+    {
+      "id": "G01",
+      "order": {
+        "order_id": "901",
+        "status": "已签收",
+        "amount": 269900,
+        "quantity": 1,
+        "sku": "ST-60",
+        "spec": "雾霾蓝",
+        "category": "婴儿推车",
+        "packaging_opened": true,
+        "created_at": "2026-10-29T10:00:00",
+        "paid_at": "2026-10-29T10:15:00",
+        "shipped_at": "2026-10-30T10:00:00",
+        "signed_at": "2026-11-02T10:00:00"
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": true
+      },
+      "now": "2026-11-05T10:00:00",
+      "note": "签收 3 天，无理由，商品完好",
+      "expected": null
+    },
+    {
+      "id": "G02",
+      "order": {
+        "order_id": "902",
+        "status": "已签收",
+        "amount": 129900,
+        "quantity": 1,
+        "sku": "ST-20",
+        "spec": "石墨灰",
+        "category": "婴儿推车",
+        "packaging_opened": true,
+        "created_at": "2026-10-27T10:00:00",
+        "paid_at": "2026-10-27T10:15:00",
+        "shipped_at": "2026-10-28T10:00:00",
+        "signed_at": "2026-10-31T10:00:00"
+      },
+      "request": {
+        "reason_code": "quality",
+        "item_count": 1,
+        "condition_ok": true
+      },
+      "now": "2026-11-05T10:00:00",
+      "note": "签收 5 天，质量问题，商品完好",
+      "expected": null
+    },
+    {
+      "id": "G03",
+      "order": {
+        "order_id": "903",
+        "status": "已签收",
+        "amount": 189900,
+        "quantity": 2,
+        "sku": "CS-04",
+        "spec": "星光灰",
+        "category": "安全座椅",
+        "packaging_opened": true,
+        "created_at": "2026-10-31T10:00:00",
+        "paid_at": "2026-10-31T10:15:00",
+        "shipped_at": "2026-11-01T10:00:00",
+        "signed_at": "2026-11-04T10:00:00"
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": true
+      },
+      "now": "2026-11-05T10:00:00",
+      "note": "签收 1 天，买 2 件退 1 件",
+      "expected": null
+    },
+    {
+      "id": "G04",
+      "order": {
+        "order_id": "904",
+        "status": "已签收",
+        "amount": 59900,
+        "quantity": 1,
+        "sku": "FB-10",
+        "spec": "奶油白",
+        "category": "辅食机",
+        "packaging_opened": true,
+        "created_at": "2026-10-26T10:00:00",
+        "paid_at": "2026-10-26T10:15:00",
+        "shipped_at": "2026-10-27T10:00:00",
+        "signed_at": "2026-10-30T10:00:00"
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": true
+      },
+      "now": "2026-11-05T10:00:00",
+      "note": "签收 6 天，仍在窗口内",
+      "expected": null
+    },
+    {
+      "id": "G05",
+      "order": {
+        "order_id": "905",
+        "status": "已签收",
+        "amount": 89900,
+        "quantity": 1,
+        "sku": "FB-30",
+        "spec": "薄荷绿",
+        "category": "辅食机",
+        "packaging_opened": true,
+        "created_at": "2026-10-24T10:00:00",
+        "paid_at": "2026-10-24T10:15:00",
+        "shipped_at": "2026-10-25T10:00:00",
+        "signed_at": "2026-10-28T10:00:00"
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": true
+      },
+      "now": "2026-11-05T10:00:00",
+      "note": "签收 8 天，无理由",
+      "expected": null
+    },
+    {
+      "id": "G06",
+      "order": {
+        "order_id": "906",
+        "status": "已签收",
+        "amount": 229900,
+        "quantity": 1,
+        "sku": "CS-12",
+        "spec": "深空黑",
+        "category": "安全座椅",
+        "packaging_opened": true,
+        "created_at": "2026-10-24T10:00:00",
+        "paid_at": "2026-10-24T10:15:00",
+        "shipped_at": "2026-10-25T10:00:00",
+        "signed_at": "2026-10-28T10:00:00"
+      },
+      "request": {
+        "reason_code": "quality",
+        "item_count": 1,
+        "condition_ok": true
+      },
+      "now": "2026-11-05T10:00:00",
+      "note": "签收 8 天，但原因是质量问题",
+      "expected": null
+    },
+    {
+      "id": "G07",
+      "order": {
+        "order_id": "907",
+        "status": "已签收",
+        "amount": 269900,
+        "quantity": 1,
+        "sku": "ST-60",
+        "spec": "雾霾蓝",
+        "category": "婴儿推车",
+        "packaging_opened": true,
+        "created_at": "2026-10-17T10:00:00",
+        "paid_at": "2026-10-17T10:15:00",
+        "shipped_at": "2026-10-18T10:00:00",
+        "signed_at": "2026-10-21T10:00:00"
+      },
+      "request": {
+        "reason_code": "quality",
+        "item_count": 1,
+        "condition_ok": true
+      },
+      "now": "2026-11-05T10:00:00",
+      "note": "签收 15 天，质量问题",
+      "expected": null
+    },
+    {
+      "id": "G08",
+      "order": {
+        "order_id": "908",
+        "status": "已签收",
+        "amount": 279900,
+        "quantity": 1,
+        "sku": "ST-60",
+        "spec": "刻字定制",
+        "category": "婴儿推车（刻字定制款）",
+        "packaging_opened": true,
+        "created_at": "2026-10-30T10:00:00",
+        "paid_at": "2026-10-30T10:15:00",
+        "shipped_at": "2026-10-31T10:00:00",
+        "signed_at": "2026-11-03T10:00:00"
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": true
+      },
+      "now": "2026-11-05T10:00:00",
+      "note": "定作商品，签收 2 天",
+      "expected": null
+    },
+    {
+      "id": "G09",
+      "order": {
+        "order_id": "909",
+        "status": "已签收",
+        "amount": 9900,
+        "quantity": 1,
+        "sku": "BT-01",
+        "spec": "标准口径",
+        "category": "奶瓶",
+        "packaging_opened": true,
+        "created_at": "2026-10-31T10:00:00",
+        "paid_at": "2026-10-31T10:15:00",
+        "shipped_at": "2026-11-01T10:00:00",
+        "signed_at": "2026-11-04T10:00:00"
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": true
+      },
+      "now": "2026-11-05T10:00:00",
+      "note": "奶瓶，已拆封",
+      "expected": null
+    },
+    {
+      "id": "G10",
+      "order": {
+        "order_id": "910",
+        "status": "已签收",
+        "amount": 9900,
+        "quantity": 1,
+        "sku": "BT-01",
+        "spec": "标准口径",
+        "category": "奶瓶",
+        "packaging_opened": false,
+        "created_at": "2026-10-30T10:00:00",
+        "paid_at": "2026-10-30T10:15:00",
+        "shipped_at": "2026-10-31T10:00:00",
+        "signed_at": "2026-11-03T10:00:00"
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": true
+      },
+      "now": "2026-11-05T10:00:00",
+      "note": "奶瓶，未拆封",
+      "expected": null
+    },
+    {
+      "id": "G11",
+      "order": {
+        "order_id": "911",
+        "status": "已签收",
+        "amount": 129900,
+        "quantity": 1,
+        "sku": "ST-20",
+        "spec": "石墨灰",
+        "category": "婴儿推车",
+        "packaging_opened": true,
+        "created_at": "2026-10-30T10:00:00",
+        "paid_at": "2026-10-30T10:15:00",
+        "shipped_at": "2026-10-31T10:00:00",
+        "signed_at": "2026-11-03T10:00:00"
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": false
+      },
+      "now": "2026-11-05T10:00:00",
+      "note": "剪掉了吊牌",
+      "expected": null
+    },
+    {
+      "id": "G12",
+      "order": {
+        "order_id": "912",
+        "status": "已签收",
+        "amount": 189900,
+        "quantity": 1,
+        "sku": "CS-04",
+        "spec": "星光灰",
+        "category": "安全座椅",
+        "packaging_opened": true,
+        "created_at": "2026-10-29T10:00:00",
+        "paid_at": "2026-10-29T10:15:00",
+        "shipped_at": "2026-10-30T10:00:00",
+        "signed_at": "2026-11-02T10:00:00"
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": false
+      },
+      "now": "2026-11-05T10:00:00",
+      "note": "装车用了一天",
+      "expected": null
+    },
+    {
+      "id": "G13",
+      "order": {
+        "order_id": "913",
+        "status": "已签收",
+        "amount": 59900,
+        "quantity": 1,
+        "sku": "FB-10",
+        "spec": "奶油白",
+        "category": "辅食机",
+        "packaging_opened": true,
+        "created_at": "2026-10-30T10:00:00",
+        "paid_at": "2026-10-30T10:15:00",
+        "shipped_at": "2026-10-31T10:00:00",
+        "signed_at": "2026-11-03T10:00:00"
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": false
+      },
+      "now": "2026-11-05T10:00:00",
+      "note": "用过一次，杯体有食物残渣",
+      "expected": null
+    },
+    {
+      "id": "G14",
+      "order": {
+        "order_id": "914",
+        "status": "待付款",
+        "amount": 89900,
+        "quantity": 1,
+        "sku": "FB-30",
+        "spec": "薄荷绿",
+        "category": "辅食机",
+        "packaging_opened": null,
+        "created_at": "2026-11-01T10:00:00",
+        "paid_at": null,
+        "shipped_at": null,
+        "signed_at": null
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": true
+      },
+      "now": "2026-11-05T10:00:00",
+      "note": "订单尚未支付",
+      "expected": null
+    },
+    {
+      "id": "G15",
+      "order": {
+        "order_id": "915",
+        "status": "退款中",
+        "amount": 229900,
+        "quantity": 1,
+        "sku": "CS-12",
+        "spec": "深空黑",
+        "category": "安全座椅",
+        "packaging_opened": true,
+        "created_at": "2026-10-28T10:00:00",
+        "paid_at": "2026-10-28T10:15:00",
+        "shipped_at": "2026-10-29T10:00:00",
+        "signed_at": "2026-11-01T10:00:00"
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": true
+      },
+      "now": "2026-11-05T10:00:00",
+      "note": "已有一笔退款在处理中",
+      "expected": null
+    },
+    {
+      "id": "G16",
+      "order": {
+        "order_id": "916",
+        "status": "已关闭",
+        "amount": 129900,
+        "quantity": 1,
+        "sku": "ST-20",
+        "spec": "石墨灰",
+        "category": "婴儿推车",
+        "packaging_opened": true,
+        "created_at": "2026-10-12T10:00:00",
+        "paid_at": "2026-10-12T10:15:00",
+        "shipped_at": "2026-10-13T10:00:00",
+        "signed_at": "2026-10-16T10:00:00"
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": true
+      },
+      "now": "2026-11-05T10:00:00",
+      "note": "订单已关闭",
+      "expected": null
+    },
+    {
+      "id": "G17",
+      "order": {
+        "order_id": "917",
+        "status": "待发货",
+        "amount": 189900,
+        "quantity": 1,
+        "sku": "CS-04",
+        "spec": "星光灰",
+        "category": "安全座椅",
+        "packaging_opened": null,
+        "created_at": "2026-11-01T10:00:00",
+        "paid_at": "2026-11-01T10:15:00",
+        "shipped_at": null,
+        "signed_at": null
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": true
+      },
+      "now": "2026-11-05T10:00:00",
+      "note": "已付款未发货，要取消",
+      "expected": null
+    },
+    {
+      "id": "G18",
+      "order": {
+        "order_id": "918",
+        "status": "已发货",
+        "amount": 269900,
+        "quantity": 1,
+        "sku": "ST-60",
+        "spec": "雾霾蓝",
+        "category": "婴儿推车",
+        "packaging_opened": null,
+        "created_at": "2026-11-01T10:00:00",
+        "paid_at": "2026-11-01T10:15:00",
+        "shipped_at": "2026-11-02T10:00:00",
+        "signed_at": null
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": true
+      },
+      "now": "2026-11-05T10:00:00",
+      "note": "货还在路上，用户不想要了",
+      "expected": null
+    },
+    {
+      "id": "G19",
+      "order": {
+        "order_id": "919",
+        "status": "已签收",
+        "amount": 129900,
+        "quantity": 1,
+        "sku": "ST-20",
+        "spec": "石墨灰",
+        "category": "婴儿推车",
+        "packaging_opened": true,
+        "created_at": "2026-10-28T10:00:00",
+        "paid_at": "2026-10-28T10:15:00",
+        "shipped_at": "2026-10-29T10:00:00",
+        "signed_at": "2026-11-01T10:00:00"
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": null
+      },
+      "now": "2026-11-05T10:00:00",
+      "note": "用户说「用了一下，不太确定算不算用过」",
+      "expected": null
+    },
+    {
+      "id": "G20",
+      "order": {
+        "order_id": "920",
+        "status": "已签收",
+        "amount": 229900,
+        "quantity": 1,
+        "sku": "CS-12",
+        "spec": "深空黑",
+        "category": "安全座椅",
+        "packaging_opened": true,
+        "created_at": "2026-10-25T10:00:00",
+        "paid_at": "2026-10-25T10:15:00",
+        "shipped_at": "2026-10-26T10:00:00",
+        "signed_at": "2026-10-29T10:00:00"
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": true
+      },
+      "now": "2026-11-05T10:00:00",
+      "note": "签收第 7 天当天申请",
+      "expected": null
+    }
+  ]
+}
