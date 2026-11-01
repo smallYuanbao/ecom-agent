@@ -1,5 +1,5 @@
 {
-  "_comment": "expected 由人工填写，格式：{eligible: bool, reason_code: str} 或 {needs_human: true}。标注标准见 docs/design/电商客服-退款评测标注规则.md",
+  "_comment": "expected 由人工填写：{eligible: bool, reason_code: str} 或 {needs_human: true}。query 是用户原话（judge 的实际输入之一），note 是给标注者看的场景说明。标注标准见 docs/design/电商客服-退款评测标注规则.md",
   "_now": "2026-11-05T10:00:00",
   "cases": [
     {
@@ -24,8 +24,12 @@
         "condition_ok": true
       },
       "now": "2026-11-05T10:00:00",
+      "query": "这个推车我不想要了，能退吗",
       "note": "签收 3 天，无理由，商品完好",
-      "expected": null
+      "expected": {
+        "eligible": true,
+        "reason_code": "ok"
+      }
     },
     {
       "id": "G02",
@@ -49,8 +53,12 @@
         "condition_ok": true
       },
       "now": "2026-11-05T10:00:00",
+      "query": "推车收到有点问题，想退货",
       "note": "签收 5 天，质量问题，商品完好",
-      "expected": null
+      "expected": {
+        "eligible": true,
+        "reason_code": "ok"
+      }
     },
     {
       "id": "G03",
@@ -74,8 +82,12 @@
         "condition_ok": true
       },
       "now": "2026-11-05T10:00:00",
+      "query": "买了两个安全座椅，想退一个",
       "note": "签收 1 天，买 2 件退 1 件",
-      "expected": null
+      "expected": {
+        "eligible": true,
+        "reason_code": "ok"
+      }
     },
     {
       "id": "G04",
@@ -99,8 +111,12 @@
         "condition_ok": true
       },
       "now": "2026-11-05T10:00:00",
+      "query": "辅食机能退吗，还没用过",
       "note": "签收 6 天，仍在窗口内",
-      "expected": null
+      "expected": {
+        "eligible": true,
+        "reason_code": "ok"
+      }
     },
     {
       "id": "G05",
@@ -124,8 +140,12 @@
         "condition_ok": true
       },
       "now": "2026-11-05T10:00:00",
+      "query": "辅食机想退，前阵子买的",
       "note": "签收 8 天，无理由",
-      "expected": null
+      "expected": {
+        "eligible": false,
+        "reason_code": "out_of_window"
+      }
     },
     {
       "id": "G06",
@@ -149,8 +169,12 @@
         "condition_ok": true
       },
       "now": "2026-11-05T10:00:00",
+      "query": "安全座椅有质量问题，收到一个多星期了能退吗",
       "note": "签收 8 天，但原因是质量问题",
-      "expected": null
+      "expected": {
+        "eligible": true,
+        "reason_code": "ok"
+      }
     },
     {
       "id": "G07",
@@ -174,8 +198,12 @@
         "condition_ok": true
       },
       "now": "2026-11-05T10:00:00",
+      "query": "推车有质量问题，半个月前收到的",
       "note": "签收 15 天，质量问题",
-      "expected": null
+      "expected": {
+        "eligible": true,
+        "reason_code": "ok"
+      }
     },
     {
       "id": "G08",
@@ -199,8 +227,12 @@
         "condition_ok": true
       },
       "now": "2026-11-05T10:00:00",
+      "query": "我刻字的推车能退吗",
       "note": "定作商品，签收 2 天",
-      "expected": null
+      "expected": {
+        "eligible": false,
+        "reason_code": "not_applicable"
+      }
     },
     {
       "id": "G09",
@@ -224,8 +256,12 @@
         "condition_ok": true
       },
       "now": "2026-11-05T10:00:00",
-      "note": "奶瓶，已拆封",
-      "expected": null
+      "query": "奶瓶拆开包装了，能退吗",
+      "note": "奶瓶，包装已拆封",
+      "expected": {
+        "eligible": false,
+        "reason_code": "not_applicable"
+      }
     },
     {
       "id": "G10",
@@ -249,8 +285,12 @@
         "condition_ok": true
       },
       "now": "2026-11-05T10:00:00",
-      "note": "奶瓶，未拆封",
-      "expected": null
+      "query": "奶瓶还没拆封，不想要了",
+      "note": "奶瓶，包装未拆封",
+      "expected": {
+        "eligible": true,
+        "reason_code": "ok"
+      }
     },
     {
       "id": "G11",
@@ -274,8 +314,12 @@
         "condition_ok": false
       },
       "now": "2026-11-05T10:00:00",
+      "query": "推车吊牌剪掉了，还能退吗",
       "note": "剪掉了吊牌",
-      "expected": null
+      "expected": {
+        "eligible": false,
+        "reason_code": "not_intact"
+      }
     },
     {
       "id": "G12",
@@ -299,8 +343,12 @@
         "condition_ok": false
       },
       "now": "2026-11-05T10:00:00",
-      "note": "装车用了一天",
-      "expected": null
+      "query": "安全座椅装车上用了一天，不想要了",
+      "note": "安全座椅已装车实际使用一天，有使用痕迹（超出查验需要）",
+      "expected": {
+        "eligible": false,
+        "reason_code": "not_intact"
+      }
     },
     {
       "id": "G13",
@@ -324,8 +372,12 @@
         "condition_ok": false
       },
       "now": "2026-11-05T10:00:00",
+      "query": "辅食机用了一次，还能退吗",
       "note": "用过一次，杯体有食物残渣",
-      "expected": null
+      "expected": {
+        "eligible": false,
+        "reason_code": "not_intact"
+      }
     },
     {
       "id": "G14",
@@ -349,8 +401,12 @@
         "condition_ok": true
       },
       "now": "2026-11-05T10:00:00",
+      "query": "这个订单我不想要了，还没付款",
       "note": "订单尚未支付",
-      "expected": null
+      "expected": {
+        "eligible": false,
+        "reason_code": "wrong_status"
+      }
     },
     {
       "id": "G15",
@@ -374,8 +430,12 @@
         "condition_ok": true
       },
       "now": "2026-11-05T10:00:00",
+      "query": "这单已经在退款了，我还想再申请一次",
       "note": "已有一笔退款在处理中",
-      "expected": null
+      "expected": {
+        "eligible": false,
+        "reason_code": "wrong_status"
+      }
     },
     {
       "id": "G16",
@@ -399,8 +459,12 @@
         "condition_ok": true
       },
       "now": "2026-11-05T10:00:00",
+      "query": "之前那个订单关闭了，还能退吗",
       "note": "订单已关闭",
-      "expected": null
+      "expected": {
+        "eligible": false,
+        "reason_code": "wrong_status"
+      }
     },
     {
       "id": "G17",
@@ -424,8 +488,12 @@
         "condition_ok": true
       },
       "now": "2026-11-05T10:00:00",
+      "query": "还没发货，我想取消订单",
       "note": "已付款未发货，要取消",
-      "expected": null
+      "expected": {
+        "eligible": true,
+        "reason_code": "ok"
+      }
     },
     {
       "id": "G18",
@@ -449,8 +517,12 @@
         "condition_ok": true
       },
       "now": "2026-11-05T10:00:00",
+      "query": "快递还没送到，我不想要了",
       "note": "货还在路上，用户不想要了",
-      "expected": null
+      "expected": {
+        "eligible": true,
+        "reason_code": "reject_then_refund"
+      }
     },
     {
       "id": "G19",
@@ -474,8 +546,11 @@
         "condition_ok": null
       },
       "now": "2026-11-05T10:00:00",
+      "query": "用了一下，不太确定算不算用过，能退吗",
       "note": "用户说「用了一下，不太确定算不算用过」",
-      "expected": null
+      "expected": {
+        "needs_human": true
+        }
     },
     {
       "id": "G20",
@@ -499,8 +574,12 @@
         "condition_ok": true
       },
       "now": "2026-11-05T10:00:00",
+      "query": "前几天买的座椅想退，今天还能申请吗",
       "note": "签收第 7 天当天申请",
-      "expected": null
+      "expected": {
+        "eligible": true,
+        "reason_code": "ok"
+      }
     }
   ]
 }

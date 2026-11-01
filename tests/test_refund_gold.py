@@ -48,7 +48,10 @@ def test_ids_are_unique_and_ordered():
 
 @pytest.mark.parametrize("case", CASES, ids=lambda c: c["id"])
 def test_case_shape(case):
-    assert set(case) >= {"id", "order", "request", "now", "note", "expected"}
+    assert set(case) >= {"id", "order", "request", "now", "query", "note", "expected"}
+    # query 是 judge 的实际输入之一，不能为空；note 只是给人看的说明
+    assert case["query"].strip(), f"{case['id']} 缺用户原话"
+    assert case["note"].strip()
     order, request = case["order"], case["request"]
 
     assert order["status"] in {
