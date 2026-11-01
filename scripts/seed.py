@@ -85,6 +85,9 @@ ORDERS = [
 # 优惠抵扣（分）：让部分订单实付低于标价，退费计算才有区分度
 DISCOUNT = {"1002": 5_000, "2001": 20_000, "4001": 8_000}
 
+# 件数：多数为 1；挑三单为 2，用于「部分退款」用例
+QUANTITY = {"1002": 2, "2003": 2, "4002": 2}
+
 
 # ---------- 物流：4 种典型形态 ----------
 # 订单号 → (最新状态, 轨迹节点)
@@ -160,6 +163,12 @@ def _order_rows(now: datetime = NOW) -> list[Order]:
             if status in {"已发货", "已签收", "退款中"}
             else None
         )
+        # 签收时间：只有「已签收 / 退款中」才有值；未签收保持 NULL（7 天窗口由此起算）
+        signed = (
+            shipped + timedelta(days=2)
+            if shipped is not None and status in {"已签收", "退款中"}
+            else None
+        )
         rows.append(
             Order(
                 id=oid,
@@ -171,6 +180,8 @@ def _order_rows(now: datetime = NOW) -> list[Order]:
                 created_at=created,
                 paid_at=paid,
                 shipped_at=shipped,
+                signed_at=signed,
+                quantity=QUANTITY.get(oid, 1),
                 tracking_no=tracking,
             )
         )

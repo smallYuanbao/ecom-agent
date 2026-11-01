@@ -183,6 +183,10 @@ class Order(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)   # 价保起算
     paid_at: Mapped[datetime | None] = mapped_column(DateTime)
     shipped_at: Mapped[datetime | None] = mapped_column(DateTime)
+    signed_at: Mapped[datetime | None] = mapped_column(DateTime)      # NULL = 未签收
+    quantity: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
     tracking_no: Mapped[str | None] = mapped_column(String)
 
     __table_args__ = (Index("idx_order_user", "user_id"),)

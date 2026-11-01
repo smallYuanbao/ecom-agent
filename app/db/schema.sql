@@ -106,6 +106,8 @@ CREATE TABLE IF NOT EXISTS orders (
   created_at        DATETIME NOT NULL,               -- 下单时间；价保从这天起算
   paid_at           DATETIME,                        -- 支付时间
   shipped_at        DATETIME,                        -- 发货时间；决定能否改地址/取消
+  signed_at         DATETIME,                        -- 签收时间；NULL = 未签收（7 天窗口从次日算）
+  quantity          INTEGER NOT NULL DEFAULT 1,      -- 件数；部分退款按件均摊
   tracking_no       TEXT                             -- 物流单号
 );
 CREATE INDEX IF NOT EXISTS idx_order_user ON orders(user_id);
