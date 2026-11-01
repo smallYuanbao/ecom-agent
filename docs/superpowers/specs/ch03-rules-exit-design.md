@@ -167,7 +167,7 @@
 
 缺任何一个，模型就只能凭常识判——那就退化成"猜"。
 
-**`reason_code` 是封闭集合**：`ok` / `out_of_window` / `not_applicable` / `not_intact` / `wrong_status`。
+**`reason_code` 是封闭集合**：`ok` / `out_of_window` / `not_applicable` / `not_intact` / `wrong_status` / `reject_then_refund`。
 不在这几个值里的，直接当格式错误重试。
 
 ### compute（纯函数，**模型不参与**）
@@ -186,9 +186,15 @@ def compute_amount(order: OrderSnapshot, judgement: Judgement, request: RefundRe
 
 ```
 退款金额 = floor(实付 × 退货件数 / 总件数)
+
+未签收（reject_then_refund）→ 全额退（用户没见过货，没有"退几件"的概念）
 ```
 
 运费不参与计算（`amount` 本身就是商品实付）。
+
+**`reject_then_refund` 的来源**：已发货未签收时用户申请退款，政策上走「拒收 → 包裹退回 → 全额退」。
+它不是"系统判不了"（那会转人工），而是一条**可执行的政策路径**——
+`respond` 要据此给出"请拒收"的指引，而不是"请寄回"。
 
 **compute 不再判资格**——那是 `judge` 的事。它只做一件事：**把"可退"翻译成一个精确的数字**。
 

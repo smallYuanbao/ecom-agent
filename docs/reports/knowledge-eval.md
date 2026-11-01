@@ -1,6 +1,6 @@
 # 知识出口评测（Ch02 Task 7）
 
-> 语料 kb_version=`c5cac0fe8607` ｜ 42 条查询（拒答题不参与） ｜ 生成 temperature=0.2，同批数据重跑会有细微差异
+> 语料 kb_version=`2f59fbaa6c7a` ｜ 42 条查询（拒答题不参与） ｜ 生成 temperature=0.2，同批数据重跑会有细微差异
 
 ## 总表
 
