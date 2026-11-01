@@ -36,18 +36,23 @@
 
 ## P2 · 知识库与检索（1.5 天）
 
-| # | 任务 | 依据 | 产出 | 验收 |
-|---|---|---|---|---|
-| P2-1 | 写 6 篇文档（returns/shipping/invoice/member/promo/products） | 数据设计 §二 | `data/kb/*.md` | 每篇 ≥2 个边界条件 |
-| P2-2 | 法规 5 条清洗 + 元数据 | 数据设计 §三 | `data/kb/regulations/*.md` | 每条含 chapter/article/source |
-| P2-3 | 切分脚本 | 数据设计 §八 | `scripts/build_chunks.py` | 文档按 `##`、法规按条 |
-| P2-4 | 向量化入库 | — | `scripts/vectorize.py` | 能按 chunk id 查回 |
-| P2-5 | 混合检索（dense + BM25 + RRF） | 数据设计 §八 | `app/core/retrieval.py` | 10 条知识题 hit@3 ≥ 0.8 |
-| P2-6 | 证据闸（单阈值起步） | M3 讨论结论 | `app/core/gate.py` | 阈值可配置 |
-| P2-7 | A 出口子图 | 意图文档 §二 | `app/graph/subgraph_knowledge.py` | 端到端能答政策题 |
-| P2-8 | 知识路小评测 | — | `data/eval/knowledge_10.json` | 记录 hit@3 |
+| # | 任务 | 依据 | 产出 | 验收 | 状态 |
+|---|---|---|---|---|---|
+| P2-1 | 写 6 篇文档（returns/shipping/invoice/member/promo/products） | 数据设计 §二 | `data/kb/*.md` | 每篇 ≥2 个边界条件 | ✅ |
+| P2-2 | 法规 5 条清洗 + 元数据 | 数据设计 §三 | `data/kb/regulations/*.md` | 每条含 chapter/article/source | ✅ |
+| P2-3 | 切分脚本 | 数据设计 §八 | `app/kb/loader.py` + `scripts/build_kb.py` | 文档按 `##`、法规按条 | ✅ |
+| P2-4 | 向量化入库 | — | `scripts/build_kb.py`（切分与入库合一） | 能按 chunk id 查回 | ✅ |
+| P2-5 | 混合检索（dense + BM25 + RRF） | 数据设计 §八 | `app/core/retrieval.py` | 10 条知识题 hit@3 ≥ 0.8 | ✅ |
+| P2-6 | 证据闸（单阈值起步） | M3 讨论结论 | `app/core/gate.py` | 阈值可配置 | ✅ |
+| P2-7 | A 出口子图 | 意图文档 §二 | `app/graph/subgraph_knowledge.py` | 端到端能答政策题 | ✅ |
+| P2-8 | 知识路小评测 | — | `data/eval/knowledge_v1.yaml` | 记录 hit@3 | ✅ |
 
-**阶段验收**：问「拆封的音像制品能退吗」→ 命中第六条 + 给出引用。
+**阶段验收**：问「拆封的音像制品能退吗」→ 命中第六条 + 给出引用。✅
+
+**Ch02 交付情况**：P2-1 ~ P2-8 全部完成。额外交付了检索选型实验
+（`docs/reports/retrieval-eval.md`：dense 1.00 / hybrid 0.95 / bm25 0.76）
+与证据闸校准（`docs/reports/gate-eval.md`：阈值 0.55）。
+完整验收见 [ch02-acceptance.md](../../reports/ch02-acceptance.md)。
 
 ---
 
@@ -78,9 +83,9 @@
 |---|---|---|---|---|
 | P4-1 | B 出口子图（参数校验 → 工具 → 结果校验） | 意图文档 | `app/graph/subgraph_data.py` | 查订单/物流/库存各 1 例 |
 | P4-2 | 工具实现（身份注入 + 归属校验） | D7、S4 | `app/tools/*.py` | 模型传的 user_id 被覆盖 |
-| P4-3 | D 出口 + `create_ticket`（确认 + 幂等） | D10、D11 | `app/tools/tickets.py` | 重复 request_id 只建一张 |
-| P4-4 | E 出口三脚本 | 意图文档 §六 | `app/graph/nodes.py` | 三类输入各 1 例 |
-| P4-5 | 兜底模板 + 落池 | 意图文档 §七 | `app/core/fallback.py` | 低置信问题进入 low_conf 表 |
+| P4-3 | D 出口 + `create_ticket`（确认 + 幂等） | D10、D11 | `app/tools/tickets.py` | 重复 request_id 只建一张 | ⚠️ 话术已在 Ch02 完成，建单待做 |
+| P4-4 | E 出口三脚本 | 意图文档 §六 | `app/graph/nodes.py` | 三类输入各 1 例 | ✅ Ch02 完成 |
+| P4-5 | 兜底模板 + 落池 | 意图文档 §七 | `app/core/fallback.py` | 低置信问题进入 low_conf 表 | ✅ Ch02 完成 |
 | P4-6 | **B1 确定性工具链**：订单→物流两级依赖（先取 `tracking_no`）；缺 `order_id` 时列单让用户选 | 意图文档、D3 | `app/graph/subgraph_data.py` | 「订单 1001 到哪了」两步链跑通；无单号时 `list_user_orders` + interrupt 选单 |
 
 **阶段验收**：五个出口各有一条 happy path。

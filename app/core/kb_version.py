@@ -11,6 +11,7 @@
 排序是哈希稳定的前提，放在这里再排一次是有意的防御。
 """
 import hashlib
+from functools import lru_cache
 
 from app.kb.loader import load_chunks
 
@@ -22,3 +23,13 @@ def kb_version(chunks: list[dict] | None = None) -> str:
         f"{chunk['id']}\t{chunk['text']}" for chunk in sorted(items, key=lambda c: c["id"])
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:12]
+
+
+@lru_cache
+def cached_kb_version() -> str:
+    """给 `/api/meta` 用：每次请求都读 7 个文件没必要，内容不变时哈希也不变。
+
+    语料改了要重启服务（或清缓存）才会更新——这是有意的：
+    kb_version 是"当前进程在用的知识库"，不是"磁盘上现在的样子"。
+    """
+    return kb_version()

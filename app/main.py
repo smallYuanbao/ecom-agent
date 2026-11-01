@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from app.api.chat import ChatError, run_turn
 from app.config import get_settings, validate_or_die
+from app.core.kb_version import cached_kb_version
 from app.core.logging import new_trace_id, setup_logging, trace_id_var
 
 logger = logging.getLogger(__name__)
@@ -63,7 +64,13 @@ async def health() -> dict:
 @app.get("/api/meta")
 async def meta() -> dict:
     """评测快照用（L1 / K6）：不含任何密钥值。"""
-    return {"version": app.version, **get_settings().safe_summary()}
+    return {
+        "version": app.version,
+        **get_settings().safe_summary(),
+        # 放在后面覆盖：safe_summary 里的 kb_version 来自配置（永远是空串），
+        # 真正该报的是**当前语料算出来的**哈希
+        "kb_version": cached_kb_version(),      # K6：评测快照靠它判断可比性
+    }
 
 
 @app.post("/api/chat")

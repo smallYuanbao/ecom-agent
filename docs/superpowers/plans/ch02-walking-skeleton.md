@@ -496,15 +496,18 @@ async def run_turn(message: str, conversation_id: int | None, trace_id: str) -> 
 
 ### Task 10: 验收
 
-- [ ] 五条端到端 curl 全部符合预期（含"规则类无金额"）
-- [ ] `uv run pytest -q` 全绿
-- [ ] `scripts/eval_knowledge.py` hit@3 记录在 `docs/reports/`
-- [ ] `/api/meta` 返回 `kb_version`
-- [ ] 更新 `00-tasks.md` 对应勾选
-- [ ] 记录意图分类的实际准确率（供 Ch04 调边界用）
-- [ ] **迷你质量传导表**：15 道题上把「检索是否命中」×「答案是否含 expect_points」列成 2×2，
-      人工核验「**检索未命中但答案完整**」的那几条——那是编造风险最高的地方（Ch06 重点）
-- [ ] 该表写入 `docs/reports/`，作为 P7-7 的第一次数据点
+- [x] 七条端到端 curl 全部符合预期（含"规则类无金额"）
+- [x] `uv run pytest -q` 全绿（231 passed）
+- [x] 检索/闸/知识出口三个评测报告落到 `docs/reports/`
+- [x] `/api/meta` 返回 `kb_version`（`a8b084ac29b9`）
+- [x] 记录意图分类的实际准确率：**12/12 = 100%**（供 Ch04 调边界用）
+- [x] **迷你质量传导表**：检索命中 × 答案覆盖要点 → 见
+      [ch02-acceptance.md](../../reports/ch02-acceptance.md) 第五节
+- [x] 更新 `00-tasks.md` 对应勾选（P2-1~P2-8、P4-4、P4-5）
+
+**质量传导的一个诚实说明**：四格中「检索未命中但答案完整」为 0，
+**但这批题检索命中率是 100%，没有"未命中"的样本**——所以这条证据很弱，
+不能据此说"系统不会编造"。Ch07 的 P7-7 要用必然失手的样本重测。
 
 **Commit:** `test: Ch02 验收（骨架 + 知识出口 + 占位）`
 
