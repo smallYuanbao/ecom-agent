@@ -28,7 +28,7 @@
 | P1-5 | messages repository | M1、C1、K4 | `app/db/repo_message.py` | 支持 `status` 与 `client_message_id`，重复键返回首次 id | ✅ |
 | P1-6 | orders/stock/coupons 仓库（**落表，不 mock**） | S1、数据设计 | `app/db/repo_order.py` | **`user_id` 必填**，越权返回 NotFound | ✅ |
 | P1-7 | seed 脚本 | 数据设计 §四/§五 | `scripts/seed.py` | 6 SKU / 20 订单 / 5 券，重复执行不翻倍 | ✅ |
-| P1-8 | P1 测试 | S1 | `tests/test_models.py`、`test_repo_order.py`、`test_repo_message.py`、`test_seed.py` | 越权、必填参数、幂等索引、seed 覆盖度 | ✅ |
+| P1-8 | P1 测试 | S1 | `tests/test_models.py`、`tests/test_repo_order.py`、`tests/test_repo_message.py`、`tests/test_seed.py` | 越权、必填参数、幂等索引、seed 覆盖度 | ✅ |
 
 **阶段验收**：`python scripts/init_db.py && python scripts/seed.py` 后，`get_order("2001", user_id="u1")` 抛 NotFound。✅ 已验证
 
