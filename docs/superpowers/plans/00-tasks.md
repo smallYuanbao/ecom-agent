@@ -129,7 +129,7 @@ B（数据）待 Ch04、C（规则）待 Ch03。
 | P6-2 | 会话归属 404 | S2 | `app/api/chat.py` | 猜 id 返回 404 | ⏳ |
 | P6-3 | Prompt 四区结构 | S3 | `app/core/prompts.py` | 用户/检索/工具内容包裹 | ⏳ |
 | P6-4 | 工具校验装饰器 | S4 | `app/tools/decorators.py` | 统一注入+校验 | ⏳ |
-| P6-5 | 输出检查（金额/措辞） | S6 | `app/core/output_guard.py` | 违规回答被改写 | ⏳ |
+| P6-5 | 输出检查（金额/措辞）。**机械校验优先**：金额必须等于 `compute` 输出、订单字段必须来自工具返回值，不用模型判 | S6 | `app/core/output_guard.py` | 违规回答被改写；两条机械校验各有反向用例 | ⏳ |
 | P6-6 | 日志收口 + 密钥检查 | S5 | `app/core/logging.py` | 日志里搜不到 key | ⏳ |
 | P6-7 | 五个必测场景 | S1–S6 | `tests/test_security.py` | 全部通过 | ⏳ |
 
