@@ -8,6 +8,7 @@
 
 **Spec:** [ch03-rules-exit-design.md](../specs/ch03-rules-exit-design.md)
 **规则来源:** [电商客服-规则表.md](../../design/电商客服-规则表.md)
+**标注规则:** [电商客服-退款评测标注规则.md](../../design/电商客服-退款评测标注规则.md)
 
 ---
 
