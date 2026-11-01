@@ -19,23 +19,23 @@ NOW = datetime(2026, 11, 5, 10, 0)
 
 def order(**kwargs) -> OrderSnapshot:
     """默认一个「已签收 3 天、普通商品」的可退订单，按需覆盖字段。"""
-    defaults = dict(
-        order_id="1001",
-        status="已签收",
-        amount=269900,
-        quantity=1,
-        category="婴儿推车",
-        packaging_opened=True,
-        created_at=NOW - timedelta(days=7),
-        shipped_at=NOW - timedelta(days=5),
-        signed_at=NOW - timedelta(days=3),
-    )
+    defaults = {
+        "order_id": "1001",
+        "status": "已签收",
+        "amount": 269900,
+        "quantity": 1,
+        "category": "婴儿推车",
+        "packaging_opened": True,
+        "created_at": NOW - timedelta(days=7),
+        "shipped_at": NOW - timedelta(days=5),
+        "signed_at": NOW - timedelta(days=3),
+    }
     defaults.update(kwargs)
     return OrderSnapshot(**defaults)
 
 
 def request(**kwargs) -> RefundRequest:
-    defaults = dict(reason_code="no_reason", item_count=1, condition_ok=True)
+    defaults = {"reason_code": "no_reason", "item_count": 1, "condition_ok": True}
     defaults.update(kwargs)
     return RefundRequest(**defaults)
 
