@@ -63,18 +63,19 @@
 
 | # | 任务 | 依据 | 产出 | 验收 | 状态 |
 |---|---|---|---|---|---|
-| P3-1 | 规则表设计（退款/价保/变更） | 数据设计 §六 | `app/rules/*.yaml` 或常量 | 每条规则可单独调用 | ⏳ |
-| P3-2 | `compute` 纯函数 + 单测 | D1、B+ | `app/rules/refund.py` | 10 个用例覆盖正常/边界 | ⏳ |
-| P3-3 | 状态机骨架（8 状态 15 转移） | D0、D1 | `app/graph/rules_exit.py` | 空实现可跑通 | ⏳ |
-| P3-4 | `intake`：必填校验 | D1 | `app/graph/nodes.py` | 缺字段直接进 need_info | ⏳ |
-| P3-5 | `extract`：LLM 结构化抽取 | D1 | 同上 | 抽不到时返回缺失列表 | ⏳ |
-| P3-6 | `validate`：齐全 + 一致性 | D2 | 同上 | 矛盾数据（日期倒挂）能识别 | ⏳ |
-| P3-7 | `need_info`：追问 + 恢复 | D3、M6 | 同上 | 补充后能接回 | ⏳ |
-| P3-8 | `query_data`：调工具 | D1 | 同上 | 查不到走 need_info | ⏳ |
-| P3-9 | `compliance`：红线 | D2 | 同上 | 触发后转人工 | ⏳ |
-| P3-10 | `respond`：金额只复述 | D8、S6 | 同上 | 回答中的金额必来自 compute | ⏳ |
-| P3-11 | audit trail → trace_span | L7 | `app/core/tracer.py` | 每个节点一条 span | ⏳ |
-| P3-12 | 手算 10 份合同对拍 | L3 | `data/eval/refund_10.json` | 金额 10/10 一致 | ⏳ |
+| P3-1 | 规则表设计（退款） | 数据设计 §六 | `docs/design/电商客服-规则表.md`、`app/rules/eligibility.py` | 10 条规则各有正反用例 | ✅ |
+| P3-2 | `compute` 纯函数 + 单测 | D1、B+ | `app/rules/refund.py` | 10 个用例覆盖正常/边界 | ✅ |
+| P3-3 | 状态机骨架（9 状态 17 转移） | D0、D1 | `app/graph/rules_exit.py` | 空实现可跑通 | ✅ |
+| P3-4 | `intake`：抽单号 + 列候选 | D1 | `app/graph/rules_exit.py` | 缺字段直接进 need_info | ✅ |
+| P3-5 | `extract`：LLM 结构化抽取 | D1 | `app/graph/rules_exit.py`、`app/core/prompts.py` | 抽不到时返回缺失列表 | ✅ |
+| P3-6 | `validate`：齐全 + 一致性 | D2 | `app/graph/rules_exit.py` | 矛盾数据（日期倒挂）能识别 | ✅ |
+| P3-7 | `need_info`：追问 + 恢复 | D3、M6 | `app/graph/rules_exit.py` | 补充后能接回 | ✅ |
+| P3-8 | `query_data`：订单 + 政策 | D1 | `app/graph/rules_exit.py` | 查不到走 need_info | ✅ |
+| P3-9 | **`judge`：模型判资格 + gold set** | 方案 C | `app/graph/rules_exit.py`、`data/eval/refund_gold_20.json` | 分组准确率达标（见验收报告） | ✅ |
+| P3-10 | `compliance`：红线 + 独立复算 | D2 | `app/graph/rules_exit.py` | 触发后转人工 | ✅ |
+| P3-11 | `respond`：金额只复述 | D8、S6 | `app/graph/rules_exit.py` | 回答中的金额必来自 compute | ✅ |
+| P3-12 | audit trail → trace_span | L7 | `app/core/tracer.py` | 每个节点一条 span | ✅ |
+| P3-13 | 手算 10 份合同对拍 | L3 | `data/eval/refund_10.json`、`scripts/eval_refund.py` | 金额 10/10 一致 | ✅ |
 
 **阶段验收**：curl 一次完整退费，金额与手算一致；超时 P95 记录在案（C5）。
 
@@ -113,6 +114,12 @@ B（数据）待 Ch04、C（规则）待 Ch03。
 | P5-9 | **E 出口只读 ReAct**：harness（工具注册 / 循环 / 步数封顶 / trace）+ 兜底接入 | 架构取舍讨论 | `app/core/react.py`、`app/graph/fallback_agent.py` | 规则未命中的长尾能调工具作答；写操作不在工具集；超 4 步收敛到脚本 | ⏳ |
 | P5-10 | *(可选)* **B2**：B 出口参数失败分支接 ReAct | 同 P5-9 | 复用 `app/core/react.py` | 仅当评测显示「参数抽取失败 / 需澄清」占比 > 20% 时做 | ⏳ |
 | P5-11 | **多意图澄清**：`multi_intent=true` 时反问「您想先处理哪一件？」，`pending_question` 记住选择，下一轮接回 | M4、M6 | `app/graph/state.py`、`app/graph/nodes.py` | 双诉求输入 → 反问 → 下一轮「先查物流」能接回 data 出口 | ⏳ |
+| P5-12 | **checkpointer + `interrupt`**：图内暂停/恢复，替代 Ch03 的 DB 版追问。**触发条件**：需要"同一轮内原地续跑、不重跑已完成节点"，或人工审核要插在流程中间 | M5 | `app/graph/build.py`、`app/graph/rules_exit.py` | `need_info` 用 `interrupt` 挂起；同一 `thread_id` 恢复后从断点继续（不重跑 `intake`/`extract`）；`SqliteSaver` 落库，进程重启可恢复 | ⏳ |
+
+**P5-12 为什么单列**：Ch03 Task 5 的 `need_info` 已经把追问做成了"写 `pending_question` → 下一轮重跑"，
+用户体验能跑通，但**每轮都从头执行**。`interrupt` 换来的是"断点续跑"，
+代价是要引入 checkpointer 与 `thread_id` 生命周期管理。不是必需项，是**能力升级项**——
+先确认 DB 版哪里不够（例如人工审核插队、长流程重跑成本），再决定做不做。
 
 **P5-9 / P5-10 的取舍**（依据：Agent 与 Workflow 边界讨论）
 
@@ -149,6 +156,16 @@ B（数据）待 Ch04、C（规则）待 Ch03。
 | P7-5 | 修失败样本跑第二轮 | — | `docs/reports/run-02.md` | 指标变化可解释 | ⏳ |
 | P7-6 | 阈值扫描 | 置信度讨论 | 报告一节 | 误放/误拦曲线 | ⏳ |
 | P7-7 | **质量传导对照**：同批知识样本上把「检索命中」×「答案覆盖要点」列成 2×2 | L1、K6 | `docs/reports/quality-propagation.md` | 四格都有样本；给出「检索未命中但答案完整」的比例，人工核验 3 条是否编造 | ⏳ |
+| P7-8 | **退款困难组扩充 + 评测方法论**：现有 10 条转为 dev set；新增 10–20 条按失败类型分层（规则顺序 / 字段粒度 / 数据缺口 / 语义模糊 / 多轮补充），**新增部分只做盲测，不参与调 prompt**；报告加 Wilson 95% CI 与 per-class 准确率 | Ch03 验收（n=10，CI [40%, 89%]） | `data/eval/refund_hard_test.json`、`scripts/eval_refund.py` | 困难组 n ≥ 20；每类 ≥ 3 条；报告给出 CI 与分类准确率；盲测集不参与调参 | ⏳ |
+
+**为什么 P7-8 在 Ch07 而不是 Ch03 补**：Ch03 的 10 条已经用来改过两次 prompt
+（`condition_ok=null` 禁令、原话优先），它事实上是 **dev set**，不再是干净测试集。
+继续在它上面加题、调参，只是在更大的训练集上自测。正确做法是
+**Ch07 一次性做分层抽样 + 留盲测 + 报置信区间**，而不是在 Ch03 临时加几条把分数撑好看。
+
+> Ch03 现状：`7/10` 的 95% CI ≈ [40%, 89%]，只能支撑"模型显著优于规则（2/10）"这个方向性结论，
+> 支撑不了"准确率 70%"这种精确表述。相关记录见
+> [ch03-acceptance.md](../../reports/ch03-acceptance.md) 与 [refund-eval.md](../../reports/refund-eval.md)。
 
 ---
 

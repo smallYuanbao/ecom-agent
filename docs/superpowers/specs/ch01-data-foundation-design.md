@@ -220,6 +220,10 @@ stock / coupons （独立业务表）
 
 **索引**：`idx_order_user(user_id)`。
 
+> **Ch03 增补**：`signed_at`（签收时间，7 天窗口起算）、`quantity`（件数，部分退款）、
+> `category`（商品类别，第六条/第七条判定）。字段定义见
+> [ch03-rules-exit-design.md](../superpowers/specs/ch03-rules-exit-design.md) 的 Task 1 / Task 8。
+
 ---
 
 ### 8. logistics（物流）

@@ -1,4 +1,4 @@
-# Ch03 设计：C 出口（退款 8 状态流水线）
+# Ch03 设计：C 出口（退款 9 状态流水线）
 
 > 实施计划：[ch03-rules-exit.md](../plans/ch03-rules-exit.md)
 > 规则来源：[电商客服-规则表.md](../../design/电商客服-规则表.md)
@@ -13,15 +13,23 @@
 
 验收标准：
 
-1. 8 个状态都能走到（每个状态至少一条测试路径）
-2. 15 条转移各有测试，7 条守卫各有正反用例
+1. 9 个状态都能走到（每个状态至少一条测试路径）
+2. 17 条转移各有测试，13 条守卫各有正反用例
 3. **手算 10 份合同，金额 10/10 一致**
 4. 规则表的 10 条判定各有正反用例
 5. 缺 `order_id` → 列出用户最近订单让用户点选（不是追问文字）
 6. 触红线 → 转人工，**不经过 respond**
 7. 回答里的金额必须**逐字等于** `compute` 的输出
 8. 每个状态落一行 `trace_span`
-9. **`judge` 的判定准确率 ≥ 85%**（20–30 单 gold set，人工标注）
+9. **`judge` 的判定准确率分组验收**（人工标注，两组分开报）：
+   - 简单组 20 单（规则覆盖范围内）：准确率 ≥ 90%，测**不退化**
+   - 困难组 10 单：A 组（规则判不了）≥ 3/4，B 组（规则判错）≥ 4/6，测**增量价值**
+
+   > 困难组的规则基线已实测为 2/10（A 组 2/4、B 组 0/6）。B 组的 0/6 是"从规则失败处挑题"的构造结果，
+   > 不是抽样估计，因此 B 组用绝对门槛 4/6，而不是"超过规则"。`None` 计为 `needs_human`——代码判不了时，正确行为就是转人工。
+   > H04 因规则 8 修复从 B 组移入 A 组，分组跟随当前规则行为。
+
+   > 不能只报总准确率：规则实现在简单组上已经 20/20，合并统计会掩盖模型到底有没有用。
 
 ## 技术栈
 
@@ -67,8 +75,8 @@
 | 2 | intake | 缺必填 | need_info | 守卫 |
 | 3 | extract | 抽取完成 | validate | 无条件 |
 | 4 | validate | 要素齐全且一致 | query_data | 守卫 |
-| 5 | validate | 缺失 / 矛盾 | need_info | 守卫 |
-| 6 | validate | 重试 2 次仍失败 | 转人工 | 守卫 |
+| 5 | validate | 缺失 / 查无 | need_info | 守卫 |
+| 6 | validate | 重试 2 次仍失败，或日期倒挂（用户改不了） | 转人工 | 守卫 |
 | 7 | need_info | 用户补充完整 | validate | 无条件 |
 | 8 | need_info | 用户放弃 / 超时 | 结束 | 守卫 |
 | 9 | query_data | 查到订单**且**政策检索非空 | judge | 守卫 |
@@ -81,6 +89,28 @@
 | 16 | compliance | 触红线 | 转人工 | 守卫 |
 | 17 | respond | 总是 | 结束 | 无条件 |
 
+### 节点名对照（英文 → 中文 → 职责）
+
+| 节点 | 中文 | 职责 |
+|---|---|---|
+| `intake` | 受理 | 正则抠订单号，不做业务校验 |
+| `extract` | 抽取 | 模型抽出原因 / 件数 / 完好程度 / 是否拆封 |
+| `validate` | 校验 | 要素齐不齐、是不是本人的单、日期是否矛盾 |
+| `need_info` | 补充信息 | 缺什么问什么；缺单号时列候选让用户点 |
+| `query_data` | 查数据 | 订单快照 + 退款政策原文 |
+| `judge` | 判定 | 模型判「能不能退」，给理由码与置信度 |
+| `compute` | 算钱 | 纯函数算金额（分），不判资格 |
+| `compliance` | 合规核对 | 红线 + 规则代码独立复算 |
+| `respond` | 回复 | 模型组织话术，金额逐字引用 compute |
+
+**「转人工」不是第 10 个节点。** 主图已经有 `human` 出口，子图把转人工写成一条边到 `END`：
+触发它的节点先写好 `answer` / `actions` / `transfer_reason`，主图据此展示。
+所以"9 状态"就是 `intake / extract / validate / need_info / query_data / judge / compute / compliance / respond`。
+
+**第 7/8 条在实现上合并成一个条件边**：`need_info` 只有一个出口，
+`after_need_info` 同时判断"用户已补充"（→ `validate`）与"仍在等待 / 放弃"（→ `END`）。
+转移表按业务语义记两条，代码里是一个守卫。
+
 **第 12/13 条是新加的**：模型给 `confidence`，低于阈值直接转人工——
 这是 `condition_ok=null` 那条 fail-closed 原则的推广：**任何"拿不准"都不放行**。
 
@@ -91,86 +121,147 @@
 
 ## 各节点契约
 
-### intake（代码）
+### intake · 受理（代码）
 
 | 项 | 内容 |
 |---|---|
 | 读 | `resolved_query` / `raw_query`、`conversation_id` |
-| 写 | `order_id`（能从原句抽到就抽）、`draft` |
-| 逻辑 | 正则抽 4 位以上数字当订单号；**不做业务校验**（那是 validate 的事） |
+| 写 | `order_id`（能从原句抽到就抽）；抽到时清空 `pending_question` |
+| 逻辑 | 正则 `(?<!\d)(\d{4,})(?!\d)` 抽 4 位以上数字当订单号；**不做业务校验**（那是 validate 的事） |
 | 失败 | 抽不到 → `need_info`（带上"列出候选"的意图） |
 
 **为什么 intake 就抽订单号**：省一次 LLM 调用。订单号是纯数字，正则足够。
 
-### need_info（代码 + 中断）
+### need_info · 补充信息（代码 + 中断）
 
 | 项 | 内容 |
 |---|---|
-| 读 | 缺什么、`conversation_id` |
-| 写 | `pending_question`（写库，跨轮恢复靠它）、`answer`（追问话术） |
-| 逻辑 | 缺 `order_id` → **`list_user_orders` 列出最近 3 单，`interrupt` 让用户点选**；缺退款原因 → 文本追问 |
+| 读 | 缺什么、`conversation_id`、`user_id` |
+| 写 | `pending_question`（跨轮恢复靠它）、`answer`（追问话术）、`order_candidates` / `actions`（缺单号时） |
+| 逻辑 | 缺 `order_id` → **`list_user_orders` 列出最近 3 单，通过 `actions=[{"type": "select_order"}]` 让前端渲染点选**；缺退款原因 → 文本追问 |
 | 失败 | 用户放弃/超时 → 结束 |
 
 参考实现的这条做法值得抄：**缺单号不追问文字，直接给可选项**。同样能顺带完成归属校验。
 
-### extract（模型）
+> **不调用 LangGraph 的 `interrupt()`。**
+> `interrupt` 要能恢复，必须配 checkpointer——本项目把"图内持久化恢复（park / checkpointer）"
+> 排在 Ch05。现在就调用，图会停在 `__interrupt__` 且无法 resume；更关键的是
+> **`interrupt` 会丢弃节点本次的返回值**，`answer` / `order_candidates` 到不了 state，
+> 回复里反而没有候选列表。
+>
+> 所以 Ch03 的跨轮恢复走 DB：本轮把 `pending_question` 与候选写进 state（由上层落库），
+> 下一轮 `intake` 从用户输入里重新抽订单号。等 Ch05 接了 checkpointer，再换成真正的 park。
+
+> **`user_id` 从哪来**：`ConversationState.user_id`，目前由 API 填演示身份
+> `settings.demo_user_id`（默认 `u1`）。Ch06 接真实鉴权后替换。
+> `list_user_orders` 的 `user_id` 是 keyword-only 必填参数，缺失时不查库、退化成文字追问。
+
+### extract · 抽取（模型）
 
 | 项 | 内容 |
 |---|---|
 | 读 | `resolved_query` |
-| 写 | `draft`：`{order_id?, reason_code?, item_count?, condition_ok?}` |
-| 逻辑 | `structured_call` 抽四个字段；抽不到就是缺 |
-| 失败 | 格式错误 → 重试 1 次；仍失败 → `validate` 判缺失（不是直接转人工） |
+| 写 | `refund_draft`：`{reason_code?, item_count?, condition_ok?, packaging_opened?}` |
+| 逻辑 | `structured_call` 抽四个要素，与已有 draft **合并**（分轮补充时不能覆盖）；抽不到就是缺 |
+| 失败 | 格式错误 → `llm.structured_call` 已重试 1 次；仍失败 → 空 draft，交给 `validate` 判缺失（不是直接转人工） |
 
-**`condition_ok` 是三态**：`true` / `false` / `null`。模型拿不准时必须给 `null`，不要猜。
+**`order_id` 不在这里抽**：`intake` 的正则已经做了，重复抽会出现两份不一致的来源。
 
-### validate（代码）
+**`condition_ok` 是三态**：`true` / `false` / `null`。判据是
+**"用户在陈述事实就判断，用户在表达犹豫就留空"**：
+「试了一次」→ `false`；「不太确定算不算用过」→ `null`。不要替用户下结论。
+
+**`packaging_opened`（是否拆封）**：区分「只拆快递箱」与「拆了内塑封」，
+C2/C3 两条奶瓶规则依赖它。只拆外箱、内包装没动 → `false`。
+
+**模型返回值一律不可信**：`_clean_draft` 会丢掉越界枚举、非正整数、
+非布尔值。丢掉的后果是 `validate` 判缺失、走追问——比拿错值去算金额安全。
+
+### validate · 校验（代码）
 
 | 项 | 内容 |
 |---|---|
-| 读 | `draft` |
-| 写 | 校验结果 |
-| 逻辑 | ① 必填齐全（`order_id`、`reason_code`）② 订单存在且属于本人 ③ 日期不矛盾（签收不早于发货） |
-| 失败 | 缺失/矛盾 → `need_info`；重试 2 次仍缺失 → 转人工 |
+| 读 | `order_id`、`refund_draft`、`user_id` |
+| 写 | `validate_errors`（封闭错误码）、`order_snapshot`、`validate_retry`；放弃时另写 `transfer_reason` / `answer` / `actions` |
+| 逻辑 | ① 必填齐全（`order_id`、`reason_code`）② 订单存在且属于本人（`get_order(order_id, user_id=...)`）③ 日期不矛盾（签收不早于发货） |
+| 失败 | 缺失 / 查无 → `need_info`；**追问 2 次仍失败 → 转人工**；**日期倒挂 → 立即转人工** |
+
+`validate_errors` 是封闭集合：
+
+| 错误码 | 含义 | 下一步 |
+|---|---|---|
+| `missing_order_id` | 没有订单号 | `need_info`（列候选） |
+| `missing_reason_code` | 没有退款原因 | `need_info`（文本追问） |
+| `order_not_found` | 不存在**或**不属于本人 | `need_info`（列候选） |
+| `date_anomaly` | 签收早于发货 | **直接转人工** |
+
+**为什么 `date_anomaly` 不追问**：那是 ERP 回传、时区或补录造成的，**用户改不了**。
+问他"请把签收时间改对"只会多浪费一轮。这与 T5 的标注结论一致。
+
+**为什么 `order_not_found` 和越权共用一个码**：仓库层 `get_order` 对两者都抛
+`NotFound`（S1），分开发回会泄露"这单确实存在"，形成枚举 oracle。
 
 **`condition_ok` 缺失不在这里拦**——它是"判定材料"，交给 `judge` 连同政策一起考虑；
 `judge` 拿不准会给低 `confidence`，那时才转人工。
 
-### query_data（代码）
+> **`validate_retry` 的跨轮累加要等 Ch05**。现在每次请求都是新的图执行，
+> 计数在请求之间会归零；P5-3 把它落库后，"追问 2 次转人工"才真正生效。
+> 落库时还要记得**成功后清零**，否则同一会话里的下一笔退款会直接转人工。
+
+### query_data · 查数据（代码）
 
 | 项 | 内容 |
 |---|---|
-| 读 | `order_id`、`user_id`、`resolved_query` |
-| 写 | `order_snapshot`、`evidence`（退款政策检索结果） |
-| 逻辑 | ① `repo_order.get_order(order_id, user_id=...)`（归属校验在这层，S1）② `retrieval.search("退款 " + 原因 + 状态)` 取 top5 政策 |
-| 失败 | 订单 `NotFound` → `need_info`；**政策检索为空** → 转人工（系统缺内容，不是用户的错） |
+| 读 | `order_id`、`user_id`、`resolved_query`、`order_snapshot`（`validate` 已写） |
+| 写 | `order_snapshot`（仅在缺失时补查）、`evidence`（退款政策检索结果） |
+| 逻辑 | ① **快照已存在就复用**，否则 `repo_order.get_order(order_id, user_id=...)`（归属校验在这层，S1）② `retrieval.search("退款 " + 中文原因 + 状态)` 取 top5 政策 |
+| 失败 | 订单 `NotFound` → `need_info`；**政策检索为空或检索失败** → 转人工（系统缺内容，不是用户的错） |
+
+**为什么复用 `validate` 的快照**：`validate` 为了校验归属必须查库，快照直接留在 state 里。
+一轮查两次库不仅浪费，还可能因两次查询之间数据变化导致"校验的和判定的不是同一单"。
+
+**查询串里的原因要转中文**：`reason_code` 是 `quality` / `no_reason` 这类英文枚举，
+直接拼进中文查询等于给检索器喂噪声。映射见 `REASON_TEXT`。
+
+**检索失败也转人工**：向量库挂了是系统问题，让整轮返回 500 对用户没有意义；
+转人工是可执行的结果。
 
 **为什么要取政策**：`judge` 是模型，它判断资格必须有依据。
 没有政策的模型判断等于凭记忆答——那正是参考实现刻意避免的（它先 `retrieve_policy` 再交 Agent）。
 
 **归属校验必须在 code 里**：这个子图不经过工具层，工具那道校验够不着（参考实现踩过）。
 
-### judge（模型，判定资格）
+### judge · 判定（模型，判资格）
 
 | 项 | 内容 |
 |---|---|
-| 读 | `order_snapshot`、`evidence`（政策原文）、`resolved_query` |
-| 写 | `judgement`：`{eligible, reason_code, confidence, cited_article?}` |
+| 读 | `order_snapshot`、`refund_draft`（申请要素）、`evidence`（政策原文）、`resolved_query` |
+| 写 | `refund_judgement`：`{eligible, reason_code, confidence, cited_article?}`；失败时写 `transfer_reason` / `answer` / `actions` |
 | 逻辑 | `structured_call` 强制结构化；prompt 里给**规则表**与**政策原文**，要求逐条对照 |
-| 失败 | 格式错误 → 重试 1 次；仍失败 → 转人工 |
+| 失败 | 格式错误 / 结论与理由码矛盾 → 转人工（`structured_call` 内部已重试 1 次） |
 | 门槛 | `confidence < 0.7` → 转人工（**拿不准不放行**） |
 
-**prompt 里必须给的两样**：
+**prompt 里必须给的三样**：
 
 1. **规则表**（判定依据，人话版）
 2. **政策原文**（带编号，让它能引用）
+3. **申请要素**（`refund_draft`：原因 / 件数 / 完好 / 是否拆封）
 
 缺任何一个，模型就只能凭常识判——那就退化成"猜"。
+
+**输出要整条校验，不是逐字段丢弃**：`eligible` 必须是布尔、`reason_code` 必须在封闭集合、
+`confidence` 必须在 `[0,1]`，且 **`eligible` 必须与 `reason_code` 自洽**
+（`ok` / `reject_then_refund` ↔ 可退，其余 ↔ 不可退）。
+任何一项不合法 → 整条作废转人工——判定没有"部分正确"。
+
+**`condition_ok` 为 `null` 时禁止判 `not_intact`**：那等于替用户认定商品不完好。
+用户自己表达犹豫（「不太确定算不算用过」）时，正确行为是给 `< 0.6` 的 confidence 转人工，
+而不是猜一个结论。这条是真模型实测后加进 prompt 的（见改动记录 §14）。
 
 **`reason_code` 是封闭集合**：`ok` / `out_of_window` / `not_applicable` / `not_intact` / `wrong_status` / `reject_then_refund`。
 不在这几个值里的，直接当格式错误重试。
 
-### compute（纯函数，**模型不参与**）
+### compute · 算钱（纯函数，**模型不参与**）
 
 ```python
 def compute_amount(order: OrderSnapshot, judgement: Judgement, request: RefundRequest) -> int
@@ -182,13 +273,29 @@ def compute_amount(order: OrderSnapshot, judgement: Judgement, request: RefundRe
 | 输出 | 退款金额（分）；`eligible=false` 时为 0 |
 | 约束 | **无 IO、无随机、无时间依赖** |
 
-金额公式（详见规则表 §4）：
+`Judgement` 是 `judge` 通过置信度门槛后的结论，只有两个字段：
+
+```python
+@dataclass(frozen=True)
+class Judgement:
+    eligible: bool
+    reason_code: str
+```
+
+**`confidence` 不进来**：它已经在 `judge` 节点内用于分流（低于阈值直接转人工），
+传进 compute 只会让它依赖一个不该关心的值。
+
+金额公式（详见规则表 §4.1）：
 
 ```
-退款金额 = floor(实付 × 退货件数 / 总件数)
-
-未签收（reject_then_refund）→ 全额退（用户没见过货，没有"退几件"的概念）
+不可退                              → 0
+待发货（整单取消）                   → 全额
+未签收（reject_then_refund）        → 全额（用户没见过货，没有"退几件"的概念）
+其余可退                            → floor(实付 × 退货件数 / 总件数)
 ```
+
+**待发货为什么也是全额**：取消的对象是整张订单，不是其中几件。
+"只取消订单里的部分商品"是另一个业务（部分取消），当前没有建模。
 
 运费不参与计算（`amount` 本身就是商品实付）。
 
@@ -198,7 +305,7 @@ def compute_amount(order: OrderSnapshot, judgement: Judgement, request: RefundRe
 
 **compute 不再判资格**——那是 `judge` 的事。它只做一件事：**把"可退"翻译成一个精确的数字**。
 
-### compliance（代码，硬闸 + 独立复算）
+### compliance · 合规核对（代码，硬闸 + 独立复算）
 
 两件事，任一不通过 → 转人工：
 
@@ -209,17 +316,28 @@ def compute_amount(order: OrderSnapshot, judgement: Judgement, request: RefundRe
 | 1 | 退款金额 > 订单实付 |
 | 2 | 退款金额 ≤ 0 但判定可退 |
 | 3 | 签收超 7 天且原因为"无理由"，但判定可退 |
-| 4 | 商品属于法定不适用类，但判定可退 |
+| 4 | 商品属于法定不适用类（含第七条：已拆封奶瓶），但判定可退 |
+
+**红线只在"判定可退"时检查**：不可退的金额本来就是 0，不能因为它等于 0 就判 `amount_not_positive`。
+**红线不依赖复算**：即使规则实现有 bug，这四条也独立成立。
 
 **② 独立复算判定**
 
-用**规则表**在代码里再判一次，与 `judge` 的结果对比：
+用**规则表**在代码里再判一次，与 `judge` 的结果对比。
+比的是 **`(eligible, reason_code)` 这一对**，不是只比"能不能退"：
 
 | judge | 代码复算 | 处理 |
 |---|---|---|
-| 可退 | 可退 | 放行 |
-| 不可退 | 不可退 | 放行（走"不能退"话术） |
-| **不一致** | | **转人工 + 记 trace** |
+| 可退 + 同一理由码 | 可退 + 同一理由码 | 放行 |
+| 不可退 + 同一理由码 | 不可退 + 同一理由码 | 放行（走"不能退"话术） |
+| **任一不同** | | **转人工 + 记 trace** |
+| 任意 | **`None`（代码判不了）** | 放行——代码不知道答案，没资格否决 |
+
+> **为什么 `ok` 与 `reject_then_refund` 也算分歧**：两者都"可退"，但一个让用户
+> 寄回、一个让用户拒收。给错操作指引比给错结论更让人困惑。
+
+**trace 落点**：`compliance:violation`，`attrs` 里带 `violation` 与完整的模型判定。
+写失败不影响主流程（`record_span` 自己兜底）。
 
 **这才是"模型提议、代码否决"的落地**：不是代码直接推翻模型，而是**分歧本身当成异常信号**——
 要么规则表漏了情形，要么模型读错了，两种都值得人看一眼。
@@ -227,17 +345,45 @@ def compute_amount(order: OrderSnapshot, judgement: Judgement, request: RefundRe
 **为什么不在分歧时以代码为准**：那样模型就白用了；而直接采信模型又失去了可审计性。
 转人工是第三条路，代价是体验，换来的是"分歧必被看见"。
 
-### respond（模型）
-### respond（模型）
+### respond · 回复（模型）
 
 | 项 | 内容 |
 |---|---|
-| 读 | `compute` 的结构化结果、`citations` |
-| 写 | `answer` |
-| 约束 | **只能复述金额，不能计算**；金额必须逐字出现在提示里 |
+| 读 | `refund_judgement`、`refund_amount`、`order_snapshot`、`refund_draft`、`resolved_query` |
+| 写 | `answer`、`is_placeholder=False` |
+| 约束 | **只能复述金额，不能计算**；结论不能改；不可退时不提金额 |
 
-prompt 里给出算好的数字，要求"直接引用这个数字，不要自己算"。
-Ch06 会加输出校验兜底（金额必须等于 `compute` 输出）。
+**给模型的是字符串，不是数字**：`amount_text` 已经是「1249.00 元」。
+给数字（如 `124900`）它会自己除以 100、自己四舍五入——单位一错就是资金问题。
+
+**机械兜底**：可退的回答里必须出现这个金额，检查时**忽略空格 / 千分位逗号 / 全角空格**。
+没出现就**追加**一句固定话术，不重试模型——重试可能又少写，追加是确定的。
+
+> 真模型实测：第一次端到端跑出来，模型写「1249.00元」（少一个空格），
+> 严格匹配没认出来，金额被追加了第二次。校验放宽到"数字与小数位一致"后解决。
+>
+> 完整版校验（金额必须等于 `compute` 输出、多轮一致性）留 Ch06。
+
+**不可退时 `amount_text` 为空**，prompt 里明确写"不要提金额"——否则模型可能编一个"0 元"。
+
+### 观测：子图每个节点各写一行 span
+
+父图的 `run_turn` 只会在子图整体结束时看到一行 `node:rules`——里面跑了哪 9 个状态、
+各花多久，看不到。所以子图的每个节点都套一层 `_traced`，写 `rules:<node>`：
+
+```
+node:rules            ← 父图视角（整个子图一行）
+rules:intake
+rules:extract
+rules:validate
+rules:query_data
+rules:judge
+rules:compute
+rules:compliance
+rules:respond
+```
+
+写失败不影响主流程（`record_span` 自己兜底）。这满足验收项"每个状态落一行 `trace_span`"。
 
 ## 数据变更（阻塞项）
 
@@ -291,7 +437,7 @@ C 出口的每条判定都必须能在 `data/kb/` 找到依据（或明确标注
 | 代价 | 说明 | 缓解 |
 |---|---|---|
 | **同一单两次判定可能不同** | 模型有随机性 | `temperature=0` + 评测集监控一致性 |
-| **判定不可逐条对拍** | 只能测准确率，不能测"相等" | 20–30 单 gold set，准确率 ≥ 85% |
+| **判定不可逐条对拍** | 只能测准确率，不能测"相等" | 简单组 20 单 + 困难组 10 单，分组报准确率 |
 | **每轮多一次 LLM 调用** | `extract` + `judge` + `respond` = 3 次 | 预算内；C5 的 30s 仍有余量 |
 | **分歧率未知** | 模型与规则表不一致的比例要先测 | Ch03 验收时统计，> 10% 说明规则表或 prompt 有问题 |
 
@@ -299,23 +445,23 @@ C 出口的每条判定都必须能在 `data/kb/` 找到依据（或明确标注
 
 1. **`confidence` 门槛**：< 0.7 直接转人工
 2. **代码复算**：与模型不一致 → 转人工
-3. **gold set**：20–30 单人工标注，测准确率与误判方向（错放 vs 错拦）
+3. **gold set**：简单组 20 单 + 困难组 10 单，分组测准确率与误判方向（错放 vs 错拦）。困难组专门挑规则判不了/判错的案例，否则总数会被规则的高分掩盖
 4. **prompt 里给规则表原文**，不给"你看着办"
 
 ## 测试与验证
 
 | # | 测试 | 断言 |
 |---|---|---|
-| 1 | 状态可达性 | 8 个状态各有至少一条路径能走到 |
-| 2 | 转移表 | 15 条转移逐条测；7 条守卫各有正反用例 |
+| 1 | 状态可达性 | 9 个状态各有至少一条路径能走到 |
+| 2 | 转移表 | 17 条转移逐条测；13 条守卫各有正反用例 |
 | 3 | **手算对拍** | `data/eval/refund_10.json` 十份合同，金额 10/10 一致 |
 | 4 | 规则判定 | 规则表 10 条各有正反用例 |
-| 5 | 缺 order_id | 返回候选列表 + `interrupt`，不是纯文本追问 |
+| 5 | 缺 order_id | 返回候选列表 + `actions.type=select_order`，不是纯文本追问（`interrupt` 留到 Ch05 接 checkpointer） |
 | 6 | 触红线 | 走转人工，`respond` 未被调用 |
 | 7 | 金额一致 | `respond` 的文本里出现的金额 === `compute` 输出 |
 | 8 | 越权 | 查别人的单 → `NotFound` → need_info，不泄露"这单存在" |
 | 9 | trace | 每个状态一行 span，共享 trace_id |
-| 10 | **判定准确率** | 20–30 单 gold set，`judge` 准确率 ≥ 85% |
+| 10 | **判定准确率** | 简单组 20 单 ≥ 90%；困难组 A 组 ≥ 3/4、B 组 ≥ 4/6（规则基线 2/10，见 Task 12） |
 | 11 | **复算一致性** | 模型与代码复算的分歧率 < 10%；分歧时确实转人工 |
 
 **手算 10 份合同**的构造原则：覆盖 10 条规则各一次，加 2–3 个边界（刚好 7 天、刚好超期 1 天、2 件退 1 件）。
