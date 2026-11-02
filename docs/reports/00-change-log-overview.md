@@ -92,7 +92,7 @@ grep -rn "替换：Ch02 §1" docs/reports/
 |---|---|---|---|
 | Ch01 | 数据地基（10 表 / seed / 越权） | [ch01-data-foundation-changes.md](./ch01-data-foundation-changes.md) | ✅ 8 节 |
 | Ch02 | 主流程骨架 | [ch02-walking-skeleton-changes.md](./ch02-walking-skeleton-changes.md) | ✅ 10 / 10 节 |
-| Ch03 | C 出口状态机 | `ch03-rule-exit-changes.md` | ⏳ |
+| Ch03 | C 出口（退款规则） | [ch03-rules-exit-changes.md](./ch03-rules-exit-changes.md) | ✅ 18 / 18 节（验收见 [ch03-acceptance.md](./ch03-acceptance.md)） |
 | Ch04 | B 出口 | `ch04-data-exit-changes.md` | ⏳ |
 | Ch05 | 多轮与上下文 | `ch05-multi-turn-changes.md` | ⏳ |
 | Ch06 | 安全 | `ch06-security-changes.md` | ⏳ |
