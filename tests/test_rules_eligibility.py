@@ -136,6 +136,17 @@ def test_unknown_condition_returns_none():
     assert verdict(condition_ok=None) is None
 
 
+def test_quality_issue_with_use_trace_is_undecidable():
+    """质量问题 + 用过：代码分不清痕迹是缺陷造成的还是用户造成的，不否决。
+
+    H04 的标注结论：异响要开机才发现，「试了一次」不是把商品用旧了。
+    """
+    result = judge_eligibility(
+        order(), request(reason_code="quality", condition_ok=False), now=NOW
+    )
+    assert result is None
+
+
 # ── 规则 9：7 天窗口 ────────────────────────────────────────
 
 

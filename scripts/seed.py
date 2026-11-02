@@ -50,6 +50,18 @@ STOCK = [
 
 PRICE = {sku: price for sku, _spec, _stock, price, _status in STOCK}
 
+# 商品类别：下单时快照进 orders.category。
+# 不从 sku 前缀推——定制款（刻字）与奶瓶都没有专属前缀，
+# 类目是业务数据，应该显式维护。
+SKU_CATEGORY = {
+    "ST-20": "婴儿推车",
+    "ST-60": "婴儿推车",
+    "CS-04": "安全座椅",
+    "CS-12": "安全座椅",
+    "FB-10": "辅食机",
+    "FB-30": "辅食机",
+}
+
 
 # ---------- 20 笔订单 ----------
 # user_id, order_id, sku, 规格, 状态, 下单距今天数, 物流单号
@@ -175,6 +187,7 @@ def _order_rows(now: datetime = NOW) -> list[Order]:
                 user_id=user_id,
                 sku_id=sku,
                 spec=spec,
+                category=SKU_CATEGORY[sku],
                 status=status,
                 amount=PRICE[sku] - DISCOUNT.get(oid, 0),
                 created_at=created,

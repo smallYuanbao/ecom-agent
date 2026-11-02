@@ -15,6 +15,7 @@ from scripts.seed import (
     LOGISTICS,
     NOW,
     ORDERS,
+    SKU_CATEGORY,
     STOCK,
     _coupon_rows,
     _order_rows,
@@ -58,6 +59,16 @@ def test_coupons_cover_expired_used_and_below_threshold():
     assert any(c.expires_at < NOW for c in rows), "缺一张已过期的券"
     assert any(c.used == 1 for c in rows), "缺一张已使用的券"
     assert any(c.threshold > 100_000 for c in rows), "缺一张高门槛（未达）的券"
+
+
+def test_every_order_has_a_category():
+    """第六条（定作/鲜活/音像）与第七条（拆封奶瓶）的判定依据。
+
+    类别为空会让"不适用商品"被误判成可退——那是**多退钱**的方向。
+    """
+    for order in _order_rows():
+        assert order.category, f"{order.id} 缺 category"
+        assert order.category == SKU_CATEGORY[order.sku_id]
 
 
 def test_amounts_never_exceed_list_price():

@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS orders (
   user_id           TEXT NOT NULL,                   -- S1 归属人
   sku_id            TEXT NOT NULL,                   -- 商品型号，如 ST-60
   spec              TEXT,                            -- 规格
+  category          TEXT NOT NULL DEFAULT '',        -- 商品类别；第六条/第七条判定依据
   status            TEXT NOT NULL,                   -- 待付款/待发货/已发货/已签收/退款中/已关闭
   amount            INTEGER NOT NULL,                -- 实付金额（分）
   created_at        DATETIME NOT NULL,               -- 下单时间；价保从这天起算

@@ -5,7 +5,9 @@
 | 出口 | 状态 |
 |---|---|
 | `knowledge` | ✅ 真实子图（retrieve → gate → generate / weak_fallback） |
-| `data` / `rules` / `human` / `fallback` | 占位（明确告知"开发中"） |
+| `rules` | ✅ 真实子图（9 状态退款流水线） |
+| `data` | 占位（明确告知"开发中"） |
+| `human` / `fallback` | ✅ 真实话术 |
 
 **节点名与边一个都不改**——这就是"行走骨架"：形状先立住，函数体逐章替换。
 """
@@ -19,9 +21,9 @@ from app.graph.nodes import (
     fallback_exit,
     human_exit,
     resolve_reference,
-    rules_exit,
 )
 from app.graph.routing import route_by_intent
+from app.graph.rules_exit import build_rules_graph
 from app.graph.state import ConversationState
 
 # 出口节点名（与路由表的取值、trace 里的名字保持一致）
@@ -36,7 +38,7 @@ def build_graph() -> CompiledStateGraph:
     g.add_node("classify_intent", classify_intent)       # Task 2 换成真实分类
     g.add_node("knowledge", build_knowledge_graph())     # 编译后的子图可直接当节点
     g.add_node("data", data_exit)                        # Ch04 换成真实查询
-    g.add_node("rules", rules_exit)                      # Ch03 换成 8 状态流水线
+    g.add_node("rules", build_rules_graph())             # Ch03：9 状态退款子图
     g.add_node("human", human_exit)                      # Task 8 换成真实话术
     g.add_node("fallback", fallback_exit)                # Task 8 换成三脚本
 

@@ -75,12 +75,11 @@ async def classify_intent(state: ConversationState) -> dict:
     }
 
 
-# ── 占位出口（尚未实现的 B / C）─────────────────────────────
+# ── 占位出口（尚未实现的 B 出口）───────────────────────────
 # 话术要求：明确告知"开发中"，且**一个数字都不出现**——
 # 用户会把"约 3 个工作日""需 20 元"当成真实承诺。
 PLACEHOLDER_TEXT: dict[str, str] = {
     "data": "订单与库存查询正在开发中，您可以先转人工处理。",
-    "rules": "退费核算正在开发中，您可以先转人工处理。",
 }
 
 
@@ -99,11 +98,6 @@ def _placeholder(route: str) -> dict:
 async def data_exit(state: ConversationState) -> dict:
     """B 数据出口：Ch04 换成参数校验 → 工具 → 结果校验。"""
     return _placeholder("data")
-
-
-async def rules_exit(state: ConversationState) -> dict:
-    """C 规则出口：Ch03 换成 8 状态确定性流水线（金额由代码算）。"""
-    return _placeholder("rules")
 
 
 async def human_exit(state: ConversationState) -> dict:

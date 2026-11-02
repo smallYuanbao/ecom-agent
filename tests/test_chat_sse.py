@@ -142,7 +142,12 @@ async def test_too_long_message_is_invalid_arg(spans):
 async def test_state_passed_to_graph(spans):
     fake = FakeGraph(STRONG_CHUNKS)
     [f async for f in run_turn("你好", 42, "t-9", graph=fake)]
-    assert fake.seen_state == {"raw_query": "你好", "conversation_id": 42, "trace_id": "t-9"}
+    assert fake.seen_state == {
+        "raw_query": "你好",
+        "conversation_id": 42,
+        "trace_id": "t-9",
+        "user_id": "u1",       # 演示身份，Ch06 换成真实登录用户
+    }
     assert fake.seen_mode == "updates"
 
 

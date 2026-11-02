@@ -178,6 +178,11 @@ class Order(Base):
     user_id: Mapped[str] = mapped_column(String, nullable=False)         # S1 归属人
     sku_id: Mapped[str] = mapped_column(String, nullable=False)
     spec: Mapped[str | None] = mapped_column(String)
+    # 下单时快照的商品类别。第六条（定作/鲜活/音像/报刊）与第七条（拆封奶瓶）
+    # 需要代码可读的类别——从 sku 前缀推不出来（定制款、奶瓶都没有专属前缀）
+    category: Mapped[str] = mapped_column(
+        String, nullable=False, default="", server_default=""
+    )
     status: Mapped[str] = mapped_column(String, nullable=False)          # 待付款/待发货/已发货/已签收/退款中/已关闭
     amount: Mapped[int] = mapped_column(Integer, nullable=False)         # 实付（分）
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)   # 价保起算

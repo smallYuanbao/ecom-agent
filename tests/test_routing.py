@@ -14,14 +14,13 @@ import re
 import pytest
 
 from app.graph.build import EXIT_NODES
-from app.graph.nodes import PLACEHOLDER_TEXT, data_exit, rules_exit
+from app.graph.nodes import PLACEHOLDER_TEXT, data_exit
 from app.graph.routing import FALLBACK_ROUTE, INTENT_TO_ROUTE, route_by_intent
 
 # **仍处于占位状态的出口** → 节点函数。
-# knowledge（Task 7）、human / fallback（Task 8）已实现，行为由各自的测试文件覆盖。
+# knowledge / rules 是子图，human / fallback 已实现，行为由各自的测试覆盖。
 PLACEHOLDER_FUNCS = {
     "data": data_exit,
-    "rules": rules_exit,
 }
 
 

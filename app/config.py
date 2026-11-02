@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     chat_api_key: str = ""
     chat_base_url: str = ""
 
+    # 演示用身份：Ch02 还没有登录体系，订单归属校验需要一个固定的 user_id。
+    # Ch06 接真实鉴权后，这个值会被请求里的登录身份替换。
+    demo_user_id: str = "u1"
+
     # 向量库：本地 Docker 中的 Chroma（见 docs/reports/local-env.md）
     # 注意集合名必须独立，且建集合时显式 space=cosine（默认 l2 会让证据闸语义反转）
     chroma_host: str = "localhost"

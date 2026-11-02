@@ -29,6 +29,7 @@ from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any
 
+from app.config import get_settings
 from app.core.tracer import record_span
 from app.db.models import utcnow
 from app.graph.build import build_graph
@@ -73,6 +74,9 @@ async def run_turn(
         "raw_query": text,
         "conversation_id": conversation_id,
         "trace_id": trace_id,
+        # Ch02 没有登录体系；订单归属校验需要一个固定的演示身份。
+        # Ch06 接真实鉴权后改成从请求里取登录用户。
+        "user_id": get_settings().demo_user_id,
     }
 
     yield {"event": "ack"}

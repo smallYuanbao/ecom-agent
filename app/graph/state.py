@@ -11,6 +11,7 @@ class ConversationState(TypedDict, total=False):
     # ── 输入：调用方（API 层）填，节点只读 ──────────────────────────
     trace_id: str                 # 请求 id，串起日志与 trace_span(L7)
     conversation_id: int | None   # 会话 id，同时是图的 thread_id(D5)；None = 新会话
+    user_id: str                  # 当前用户；订单归属校验靠它（Ch06 换成真实鉴权）
     raw_query: str                # 用户原话，永不改写；审计与回放看它
 
     # ── 中间产物：节点依次写入 ────────────────────────────────────
@@ -20,6 +21,19 @@ class ConversationState(TypedDict, total=False):
     route: str                    # 5 出口之一：knowledge/data/rules/human/fallback
     evidence: list[dict]          # 命中 chunk 原文 [{id,text,source,similarity}]；本章存全量
     citation_ids: list[str]       # 最终引用了哪些 chunk，如 ["第六条","returns#退款时效"]
+
+    # ── C 出口：退款流水线（Ch03）────────────────────────────────
+    order_id: str                    # intake 从用户话里抽出的订单号
+    order_candidates: list[dict]     # need_info 列给用户点选的候选订单
+    refund_draft: dict               # extract 抽出的要素 {reason_code, item_count, condition_ok, packaging_opened}
+    validate_errors: list[str]       # validate 发现的问题；空 = 通过
+    validate_retry: int              # 已追问轮次；达到 2 次转人工
+    order_snapshot: dict             # query_data 查到的订单快照
+    refund_judgement: dict           # judge 输出 {eligible, reason_code, confidence, cited_article?}
+    refund_amount: int               # compute 算出的应退金额（分）
+    compliance_violation: str | None # 触红线 / 复算不一致的原因；None = 通过
+    pending_question: str | None     # need_info 的追问话术；非空 = 在等用户回答
+    transfer_reason: str             # 转人工的原因（trace 与落池用）
 
     # ── 输出：给用户看 ──────────────────────────────────────────
     answer: str                   # 回复正文；占位节点也必须写，不能留空

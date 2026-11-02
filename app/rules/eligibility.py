@@ -25,28 +25,29 @@ WINDOW_DAYS = 7
 class OrderSnapshot:
     """判定所需的订单快照（不依赖 ORM，便于单独测试）。"""
 
-    order_id: str
-    status: str
-    amount: int
-    quantity: int
-    category: str
-    packaging_opened: bool | None
-    created_at: datetime
-    shipped_at: datetime | None
-    signed_at: datetime | None
+    order_id: str                  # 订单号；只用于日志与追踪，不参与判定
+    status: str                    # 6 种状态之一；规则 1–5 直接命中它
+    amount: int                    # 实付金额（分），已扣优惠；算钱的基数
+    quantity: int                  # 商品总件数；部分退款按「件数/总件数」均摊
+    category: str                  # 商品类别（下单时快照）；第六条/第七条的前提
+    packaging_opened: bool | None  # 内包装是否拆封；None = 用户没说
+    created_at: datetime           # 下单时间；本条规则不用，留给价保
+    shipped_at: datetime | None    # 发货时间；判「已发货未签收」与日期倒挂
+    signed_at: datetime | None     # 签收时间；NULL = 未签收，7 天窗口的起算点
 
 
 @dataclass(frozen=True)
 class RefundRequest:
-    reason_code: str          # quality / no_reason / other
-    item_count: int
-    condition_ok: bool | None  # 三态；None = 用户没说清
+    reason_code: str           # 质量问题 quality / 不想要了 no_reason / 其他 other
+    item_count: int            # 这次要退几件；部分退款按它均摊
+    condition_ok: bool | None  # 商品是否完好；三态，None = 用户没说清
 
 
 @dataclass(frozen=True)
 class EligibilityVerdict:
-    eligible: bool
-    reason_code: str          # ok / reject_then_refund / out_of_window / ... 同 gold 集合
+    eligible: bool        # True = 可退（含拒收退款）；False = 不可退
+    reason_code: str      # 结论的理由码，封闭集合：ok / reject_then_refund /
+                          # out_of_window / not_applicable / not_intact / wrong_status
 
 
 def _within_window(signed_at: datetime, now: datetime) -> bool:
@@ -106,6 +107,11 @@ def judge_eligibility(
     if request.condition_ok is None:
         return None                       # 代码判不了，交给模型 + 低置信转人工
     if request.condition_ok is False:
+        if request.reason_code == "quality":
+            # 质量缺陷本身可能留下使用痕迹（异响要开机才能发现）。
+            # 代码分不清"缺陷造成的痕迹"与"用户造成的损坏"，因此不否决，
+            # 交由模型结合政策判断。详见 H04 的标注结论。
+            return None
         return EligibilityVerdict(False, "not_intact")
 
     # ── 规则 9：超过 7 天（质量问题不受限）──────────────────

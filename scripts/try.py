@@ -35,13 +35,49 @@ async def run_intent(text: str) -> None:
 
 
 async def run_graph(text: str) -> None:
-    """跑完整主图：看整轮的结果（意图 → 路由 → 出口 → 回答）。"""
+    """跑完整主图：看整轮的结果（意图 → 路由 → 出口 → 回答）。
+
+    带 `user_id` 与 `trace_id`：
+    - `user_id` 是退款流程做订单归属校验的前提（Ch06 前用演示身份）
+    - `trace_id` 让每个节点的 span 落进 `trace_span` 表，可事后查
+    """
+    from app.config import get_settings
+    from app.core.logging import new_trace_id
     from app.graph.build import build_graph
 
-    result = await build_graph().ainvoke({"raw_query": text})
+    trace_id = new_trace_id()
+    result = await build_graph().ainvoke(
+        {
+            "raw_query": text,
+            "user_id": get_settings().demo_user_id,
+            "trace_id": trace_id,
+        }
+    )
+    print(f"  trace_id={trace_id}")
     print(f"  resolved={result.get('resolved_query')!r}")
     print(f"  intent={result.get('intent')}  confidence={result.get('intent_confidence', 0):.2f}")
     print(f"  route={result.get('route')}  placeholder={result.get('is_placeholder')}")
+
+    # C 出口的中间产物：跑退款时才会出现
+    if result.get("order_id"):
+        print(f"  order_id={result['order_id']}")
+    if result.get("refund_draft"):
+        print(f"  draft={result['refund_draft']}")
+    if result.get("validate_errors"):
+        print(f"  validate_errors={result['validate_errors']}")
+    if result.get("refund_judgement"):
+        print(f"  judge={result['refund_judgement']}")
+    if "refund_amount" in result:
+        print(f"  amount={result['refund_amount']} 分")
+    if result.get("compliance_violation"):
+        print(f"  violation={result['compliance_violation']}")
+    if result.get("order_candidates"):
+        print(f"  order_candidates={result['order_candidates']}")
+    if result.get("pending_question"):
+        print(f"  pending_question={result['pending_question']}")
+    if result.get("transfer_reason"):
+        print(f"  transfer_reason={result['transfer_reason']}")
+
     print(f"  answer={result.get('answer')}")
     if result.get("actions"):
         print(f"  actions={result['actions']}")
