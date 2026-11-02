@@ -49,7 +49,10 @@
 
 | 文件 | 内容 |
 |---|---|
-| [../interview/ch03-refund.md](../interview/ch03-refund.md) | Ch03 面试要点：架构取舍、评测设计、踩坑故事、追问清单 |
+| [../interview/README.md](../interview/README.md) | 面试材料索引 + 跨章主线 |
+| [../interview/ch01-data-foundation.md](../interview/ch01-data-foundation.md) | Ch01：双写 DDL、幂等、越权、seed 覆盖度 |
+| [../interview/ch02-retrieval-skeleton.md](../interview/ch02-retrieval-skeleton.md) | Ch02：查表路由、检索选型、证据闸、RAG 评测 |
+| [../interview/ch03-refund.md](../interview/ch03-refund.md) | Ch03：模型判定 + 代码复算、评测设计、踩坑故事 |
 
 ## 新增报告时的检查清单
 

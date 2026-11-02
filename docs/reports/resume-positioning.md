@@ -116,7 +116,10 @@ HR 扫读能命中关键词；「混合架构」这四个字本身就是取舍�
 
 简历上的每一句都可能被追问。逐题的答法、依据代码位置、不能说的话，见：
 
-- [Ch03 面试要点](../interview/ch03-refund.md)：架构取舍、评测设计、四个踩坑故事、17 条追问清单
+- [面试材料索引](../interview/README.md)：三章共用结构与跨章主线
+- [Ch01 数据地基](../interview/ch01-data-foundation.md)：双写 DDL、幂等、越权
+- [Ch02 检索与骨架](../interview/ch02-retrieval-skeleton.md)：查表路由、检索选型、证据闸
+- [Ch03 退款流水线](../interview/ch03-refund.md)：架构取舍、评测设计、踩坑故事
 
 ## 五、措辞纪律
 
