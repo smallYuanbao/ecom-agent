@@ -1,0 +1,85 @@
+{
+  "_comment": "10 份金额合同。expected_amount 是人工按规则表 §4.1 算好的（分），不是跑代码抄的。合同覆盖整单 / 部分 / 待发货 / 拒收 / 不可退 / 越界 / 向下取整。",
+  "cases": [
+    {
+      "id": "M01",
+      "note": "整单退，1 件",
+      "order": {"status": "已签收", "amount": 269900, "quantity": 1},
+      "request": {"item_count": 1},
+      "judgement": {"eligible": true, "reason_code": "ok"},
+      "expected_amount": 269900
+    },
+    {
+      "id": "M02",
+      "note": "整单退，2 件全退",
+      "order": {"status": "已签收", "amount": 189900, "quantity": 2},
+      "request": {"item_count": 2},
+      "judgement": {"eligible": true, "reason_code": "ok"},
+      "expected_amount": 189900
+    },
+    {
+      "id": "M03",
+      "note": "部分退：1299 元买 2 件退 1 件 → 649.50 元",
+      "order": {"status": "已签收", "amount": 129900, "quantity": 2},
+      "request": {"item_count": 1},
+      "judgement": {"eligible": true, "reason_code": "ok"},
+      "expected_amount": 64950
+    },
+    {
+      "id": "M04",
+      "note": "向下取整：10 元买 3 件退 1 件 → 3.33 元（333 分，不四舍五入）",
+      "order": {"status": "已签收", "amount": 1000, "quantity": 3},
+      "request": {"item_count": 1},
+      "judgement": {"eligible": true, "reason_code": "ok"},
+      "expected_amount": 333
+    },
+    {
+      "id": "M05",
+      "note": "向下取整：10 元买 3 件退 2 件 → 6.66 元（666 分）",
+      "order": {"status": "已签收", "amount": 1000, "quantity": 3},
+      "request": {"item_count": 2},
+      "judgement": {"eligible": true, "reason_code": "ok"},
+      "expected_amount": 666
+    },
+    {
+      "id": "M06",
+      "note": "待发货整单取消：买 2 件退 1 件也退全款",
+      "order": {"status": "待发货", "amount": 189900, "quantity": 2},
+      "request": {"item_count": 1},
+      "judgement": {"eligible": true, "reason_code": "ok"},
+      "expected_amount": 189900
+    },
+    {
+      "id": "M07",
+      "note": "已发货未签收拒收退款：全额，不按件摊",
+      "order": {"status": "已发货", "amount": 189900, "quantity": 2},
+      "request": {"item_count": 1},
+      "judgement": {"eligible": true, "reason_code": "reject_then_refund"},
+      "expected_amount": 189900
+    },
+    {
+      "id": "M08",
+      "note": "不可退 → 0",
+      "order": {"status": "已签收", "amount": 269900, "quantity": 1},
+      "request": {"item_count": 1},
+      "judgement": {"eligible": false, "reason_code": "not_intact"},
+      "expected_amount": 0
+    },
+    {
+      "id": "M09",
+      "note": "件数越界：2 件却要退 5 件 → 按总件数封顶，退全款",
+      "order": {"status": "已签收", "amount": 1000, "quantity": 2},
+      "request": {"item_count": 5},
+      "judgement": {"eligible": true, "reason_code": "ok"},
+      "expected_amount": 1000
+    },
+    {
+      "id": "M10",
+      "note": "向下取整：9.99 元买 2 件退 1 件 → 4.99 元（499 分）",
+      "order": {"status": "已签收", "amount": 999, "quantity": 2},
+      "request": {"item_count": 1},
+      "judgement": {"eligible": true, "reason_code": "ok"},
+      "expected_amount": 499
+    }
+  ]
+}

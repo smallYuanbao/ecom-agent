@@ -1,0 +1,305 @@
+{
+  "_comment": "困难组：规则表判不了、或规则表会判错的案例。用途是证明模型判定的增量价值——这 10 条如果规则也能全对，说明 gold set 选错了。expected 仍由人工填写：{eligible: bool, reason_code: str} 或 {needs_human: true}。标注标准见 docs/design/电商客服-退款评测标注规则.md",
+  "_now": "2026-11-05T10:00:00",
+  "_groups": {
+    "A": "规则返回 None（判不了），H01–H04",
+    "B": "规则有结论但结论错（顺序缺陷 / 字段粒度不足 / 规则表无覆盖），H05–H10"
+  },
+  "cases": [
+    {
+      "id": "H01",
+      "group": "A",
+      "order": {
+        "order_id": "951",
+        "status": "已签收",
+        "amount": 269900,
+        "quantity": 1,
+        "sku": "ST-60",
+        "spec": "雾霾蓝",
+        "category": "婴儿推车",
+        "packaging_opened": true,
+        "created_at": "2026-10-29T10:00:00",
+        "paid_at": "2026-10-29T10:15:00",
+        "shipped_at": "2026-10-30T10:00:00",
+        "signed_at": "2026-11-02T10:00:00"
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": null
+      },
+      "now": "2026-11-05T10:00:00",
+      "query": "拆开用了一下，不太确定算不算用过，还能退吗",
+      "note": "规则：condition_ok 为 null → 返回 None（代码判不了）。完好程度语义模糊（标注规则 K7）。",
+      "expected": {
+        "needs_human": true
+      }
+    },
+    {
+      "id": "H02",
+      "group": "A",
+      "order": {
+        "order_id": "952",
+        "status": "已签收",
+        "amount": 189900,
+        "quantity": 1,
+        "sku": "CS-04",
+        "spec": "星光灰",
+        "category": "安全座椅",
+        "packaging_opened": true,
+        "created_at": "2026-10-31T10:00:00",
+        "paid_at": "2026-10-31T10:15:00",
+        "shipped_at": "2026-11-01T10:00:00",
+        "signed_at": "2026-11-04T10:00:00"
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": null
+      },
+      "now": "2026-11-05T10:00:00",
+      "query": "不想要了，能退吗",
+      "note": "规则：condition_ok 为 null → None。用户没描述商品状态，extract 抽不出完好程度。",
+      "expected": {
+        "eligible": true,
+        "reason_code": "ok"
+      }
+    },
+    {
+      "id": "H03",
+      "group": "A",
+      "order": {
+        "order_id": "953",
+        "status": "已签收",
+        "amount": 129900,
+        "quantity": 1,
+        "sku": "ST-20",
+        "spec": "石墨灰",
+        "category": "婴儿推车",
+        "packaging_opened": true,
+        "created_at": "2026-10-28T10:00:00",
+        "paid_at": "2026-10-28T10:15:00",
+        "shipped_at": "2026-10-29T10:00:00",
+        "signed_at": null
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": true
+      },
+      "now": "2026-11-05T10:00:00",
+      "query": "刚收到货，不想要了",
+      "note": "规则：已签收但 signed_at 为空 → None。ERP 签收时间未回传，7 天窗口无法起算。",
+      "expected": {
+        "needs_human": true
+      }
+    },
+    {
+      "id": "H04",
+      "group": "A",
+      "order": {
+        "order_id": "954",
+        "status": "已签收",
+        "amount": 79900,
+        "quantity": 1,
+        "sku": "FC-01",
+        "spec": "奶油白",
+        "category": "辅食机",
+        "packaging_opened": true,
+        "created_at": "2026-10-28T10:00:00",
+        "paid_at": "2026-10-28T10:15:00",
+        "shipped_at": "2026-10-29T10:00:00",
+        "signed_at": "2026-10-31T10:00:00"
+      },
+      "request": {
+        "reason_code": "quality",
+        "item_count": 1,
+        "condition_ok": false
+      },
+      "now": "2026-11-05T10:00:00",
+      "query": "辅食机一开机就有异响，我试了一次，能退吗",
+      "note": "规则：质量问题 + condition_ok=false 时返回 None（代码分不清痕迹是缺陷还是用户造成的），不否决模型。原注释：「规则 8 排在质量豁免之前，可能误杀」——已修规则 8。",
+      "expected": {
+        "eligible": true,
+        "reason_code": "ok"
+      }
+    },
+    {
+      "id": "H05",
+      "group": "B",
+      "order": {
+        "order_id": "955",
+        "status": "已签收",
+        "amount": 269900,
+        "quantity": 1,
+        "sku": "ST-60",
+        "spec": "雾霾蓝",
+        "category": "婴儿推车",
+        "packaging_opened": true,
+        "created_at": "2026-10-17T10:00:00",
+        "paid_at": "2026-10-17T10:15:00",
+        "shipped_at": "2026-10-18T10:00:00",
+        "signed_at": "2026-10-20T10:00:00"
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": true
+      },
+      "now": "2026-11-05T10:00:00",
+      "query": "下单的时候客服说可以退的，现在还行吗",
+      "note": "规则：无理由且超 7 天 → out_of_window（不可退）。若客服确有承诺，属于平台责任，应人工核实。",
+      "expected": {
+        "needs_human": true
+      }
+    },
+    {
+      "id": "H06",
+      "group": "B",
+      "order": {
+        "order_id": "956",
+        "status": "已发货",
+        "amount": 319900,
+        "quantity": 1,
+        "sku": "ST-60C",
+        "spec": "刻字·宝宝名",
+        "category": "婴儿推车（刻字定制款）",
+        "packaging_opened": true,
+        "created_at": "2026-11-01T10:00:00",
+        "paid_at": "2026-11-01T10:15:00",
+        "shipped_at": "2026-11-03T10:00:00",
+        "signed_at": null
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": true
+      },
+      "now": "2026-11-05T10:00:00",
+      "query": "刻了宝宝名字的推车还没收到，不想要了",
+      "note": "规则：已发货未签收命中规则 5 → reject_then_refund（可退）。但定作商品法定不适用七日无理由，规则 5 排在类别规则之前，是 app/rules/eligibility.py 注释里已标注的未覆盖组合。",
+      "expected": {
+        "eligible": false,
+        "reason_code": "not_applicable"
+      }
+    },
+    {
+      "id": "H07",
+      "group": "B",
+      "order": {
+        "order_id": "957",
+        "status": "已签收",
+        "amount": 269900,
+        "quantity": 1,
+        "sku": "ST-60",
+        "spec": "雾霾蓝",
+        "category": "婴儿推车",
+        "packaging_opened": true,
+        "created_at": "2026-10-30T10:00:00",
+        "paid_at": "2026-10-30T10:15:00",
+        "shipped_at": "2026-10-31T10:00:00",
+        "signed_at": "2026-11-03T10:00:00"
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": true
+      },
+      "now": "2026-11-05T10:00:00",
+      "query": "送的那个奶瓶能退吗",
+      "note": "规则：只按主商品判 → ok（可退）。赠品是否单独适用退货规则，规则表没有覆盖。",
+      "expected": {
+        "needs_human": true
+      }
+    },
+    {
+      "id": "H08",
+      "group": "B",
+      "order": {
+        "order_id": "958",
+        "status": "已签收",
+        "amount": 189900,
+        "quantity": 2,
+        "sku": "CS-04",
+        "spec": "星光灰",
+        "category": "安全座椅",
+        "packaging_opened": true,
+        "created_at": "2026-10-29T10:00:00",
+        "paid_at": "2026-10-29T10:15:00",
+        "shipped_at": "2026-10-30T10:00:00",
+        "signed_at": "2026-11-02T10:00:00"
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": false
+      },
+      "now": "2026-11-05T10:00:00",
+      "query": "两件都拆了，一件用了，另一件没动，能退没动的那件吗",
+      "note": "规则：condition_ok=false → not_intact（不可退）。但用户说的「用了」是另一件，退货件本身完好；request 只有一个 condition_ok，按件区分不了。",
+      "expected": {
+        "eligible": true,
+        "reason_code": "ok"
+      }
+    },
+    {
+      "id": "H09",
+      "group": "B",
+      "order": {
+        "order_id": "959",
+        "status": "已签收",
+        "amount": 129900,
+        "quantity": 1,
+        "sku": "ST-20",
+        "spec": "石墨灰",
+        "category": "婴儿推车",
+        "packaging_opened": true,
+        "created_at": "2026-10-31T10:00:00",
+        "paid_at": "2026-10-31T10:15:00",
+        "shipped_at": "2026-11-01T10:00:00",
+        "signed_at": "2026-11-04T10:00:00"
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": false
+      },
+      "now": "2026-11-05T10:00:00",
+      "query": "快递直接放门口，下雨淋湿了，能退吗",
+      "note": "规则：condition_ok=false → not_intact（不可退）。损坏由物流造成，责任不在用户。",
+      "expected": {
+        "needs_human": true
+      }
+    },
+    {
+      "id": "H10",
+      "group": "B",
+      "order": {
+        "order_id": "960",
+        "status": "已签收",
+        "amount": 9900,
+        "quantity": 1,
+        "sku": "BT-02",
+        "spec": "120ml",
+        "category": "奶瓶",
+        "packaging_opened": true,
+        "created_at": "2026-10-29T10:00:00",
+        "paid_at": "2026-10-29T10:15:00",
+        "shipped_at": "2026-10-30T10:00:00",
+        "signed_at": "2026-11-02T10:00:00"
+      },
+      "request": {
+        "reason_code": "no_reason",
+        "item_count": 1,
+        "condition_ok": true
+      },
+      "now": "2026-11-05T10:00:00",
+      "query": "奶瓶我只打开了快递盒，里面塑封没动，能退吗",
+      "note": "规则：packaging_opened=true 命中规则 7 → not_applicable（不可退）。但用户只拆了外箱、没拆内塑封，packaging_opened 这个布尔字段区分不了。",
+      "expected": {
+        "eligible": true,
+        "reason_code": "ok"
+      }
+    }
+  ]
+}
