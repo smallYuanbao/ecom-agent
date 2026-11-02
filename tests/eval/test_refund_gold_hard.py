@@ -17,7 +17,7 @@ import pytest
 
 from app.rules.eligibility import OrderSnapshot, RefundRequest, judge_eligibility
 
-HARD = Path(__file__).resolve().parents[1] / "data/eval/refund_gold_hard_10.json"
+HARD = Path(__file__).resolve().parents[2] / "data/eval/refund_gold_hard_10.json"
 
 REASON_CODES = {
     "ok",

@@ -32,7 +32,7 @@
 - Create: `app/graph/build.py`
 - Create: `app/graph/nodes.py`（先放占位节点）
 - Create: `app/graph/routing.py`（路由表 + 条件边函数，静态数据，无依赖）
-- Test: `tests/test_graph_smoke.py`
+- Test: `tests/graph/test_graph_smoke.py`
 
 **Interfaces:**
 
@@ -149,7 +149,7 @@ async def fallback_exit(state):         # Task 8 整块替换
 
 直接 `ainvoke` 一个状态，断言 `route` 有值、`is_placeholder` 为 True。
 
-**验收**：`pytest tests/test_graph_smoke.py -q` 绿。
+**验收**：`pytest tests/graph/test_graph_smoke.py -q` 绿。
 
 **Commit:** `feat(graph): 主图骨架（五出口全占位）`
 
@@ -161,7 +161,7 @@ async def fallback_exit(state):         # Task 8 整块替换
 - Create: `app/core/llm.py`（openai SDK 封装）
 - Create: `app/core/prompts.py`（意图 prompt）
 - Modify: `app/graph/nodes.py`（`classify_intent` 换成真实实现）
-- Test: `tests/test_intent.py`
+- Test: `tests/graph/test_intent.py`
 
 **Interfaces:**
 
@@ -211,7 +211,7 @@ def structured_call(schema: dict, messages: list[dict]) -> dict:
 ### Task 3: 路由与占位节点
 
 **Files:**
-- Test: `tests/test_routing.py`
+- Test: `tests/graph/test_routing.py`
 - （`routing.py` 与 `nodes.py` 已在 Task 1 建好；本任务**不改实现**，只补测试与文案复核）
 
 **Interfaces:**
@@ -305,7 +305,7 @@ uv run python scripts/build_kb.py
 
 **Files:**
 - Create: `app/core/retrieval.py`
-- Test: `tests/test_retrieval.py`
+- Test: `tests/core/test_retrieval.py`
 
 **Interfaces:**
 
@@ -355,7 +355,7 @@ def to_similarity(distance: float) -> float:
 **Files:**
 - Create: `app/core/gate.py`
 - Create: `app/core/fallback.py`
-- Test: `tests/test_gate.py`
+- Test: `tests/core/test_gate.py`
 
 **Interfaces:**
 
@@ -394,7 +394,7 @@ def is_strong(hits: list[dict]) -> bool:
 **Files:**
 - Create: `app/graph/knowledge.py`
 - Create: `app/core/prompts.py`（`KB_ANSWER_PROMPT`）
-- Test: `tests/test_knowledge_node.py`
+- Test: `tests/graph/test_knowledge_node.py`
 
 **Interfaces:**
 
@@ -442,7 +442,7 @@ retrieve → gate ─┬─ strong → generate
 
 **Files:**
 - Modify: `app/graph/nodes.py`
-- Test: `tests/test_human_fallback.py`
+- Test: `tests/graph/test_human_fallback.py`
 
 **Step 1: D 出口（转人工）**
 
@@ -472,7 +472,7 @@ async def human_exit(state):                 # 节点名仍是 "human"
 - Modify: `app/main.py`（替换骨架实现）
 - Create: `app/core/tracer.py`
 - Modify: `app/api/chat.py`（如已拆分）
-- Test: `tests/test_chat_sse.py`
+- Test: `tests/api/test_chat_sse.py`
 
 **Interfaces:**
 

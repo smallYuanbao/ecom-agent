@@ -82,13 +82,13 @@ HR 扫读能命中关键词；「混合架构」这四个字本身就是取舍�
 | PRAGMA 外键 + WAL | `app/db/session.py` | ✅ | 为什么挂在 connect 事件而不是启动时？ |
 | schema.sql 与 ORM 自动比对 | `scripts/init_db.py` | ✅ | 为什么两边都写？漂移怎么发现？ |
 | user_id keyword-only | `app/db/repo_order.py`、`errors.py` | ✅ | 为什么可选参数不行？为什么越权和不存在同异常？ |
-| 6 SKU / 20 订单 / 5 券 | `scripts/seed.py`、`tests/test_seed.py` | ✅ | 为什么每人 3–5 单？为什么必须有一单超 7 天？ |
+| 6 SKU / 20 订单 / 5 券 | `scripts/seed.py`、`tests/db/test_seed.py` | ✅ | 为什么每人 3–5 单？为什么必须有一单超 7 天？ |
 | 12 类意图查表路由 | `app/graph/routing.py`（Ch02） | ✅ | 为什么不用模型决策路由？ |
 | 9 状态确定性流水线 | `app/graph/rules_exit.py` | ✅ | 为什么不 ReAct？need_info 怎么恢复？ |
 | 金额纯函数 + 对拍 10/10 | `app/rules/refund.py`、`refund_10.json` | ✅ | 哪 10 份？边界怎么选？ |
 | 合规 = 红线 + 独立复算 | `app/graph/rules_exit.py` · `compliance` | ✅ | 为什么不以代码为准？分歧率怎么统计？ |
 | 30 条 gold set + 三列指标 | `scripts/eval_refund.py`、`docs/reports/refund-eval.md` | ✅ | 模型 / 规则 / 流水线分别是什么？为什么验收卡模型？ |
-| 四类转人工集成测试 | `tests/test_rules_transfer_paths.py` | ✅ | 哪四类？打桩了哪些依赖？ |
+| 四类转人工集成测试 | `tests/graph/rules/test_transfer_paths.py` | ✅ | 哪四类？打桩了哪些依赖？ |
 | 评测样本量的统计意识 | `refund-eval.md` §七、P7-8 | ✅ | 10 条够吗？CI 多宽？怎么扩？ |
 | 只读 ReAct + 4 步封顶 | Ch05 后（P5-9） | ⏳ | 为什么只读？步数为什么是 4？ |
 | 幂等去重 | `repo_message.append_message` | ✅ | 并发重试怎么办？ |

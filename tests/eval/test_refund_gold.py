@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-GOLD = Path(__file__).resolve().parents[1] / "data/eval/refund_gold_20.json"
+GOLD = Path(__file__).resolve().parents[2] / "data/eval/refund_gold_20.json"
 
 REASON_CODES = {
     "ok",

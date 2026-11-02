@@ -54,7 +54,7 @@ quantity: Mapped[int]                # 件数，默认 1
 **Files:**
 - Create: `app/rules/__init__.py`
 - Create: `app/rules/eligibility.py`
-- Test: `tests/test_rules_eligibility.py`
+- Test: `tests/rules/test_eligibility.py`
 
 **Interfaces:**
 
@@ -83,7 +83,7 @@ def judge_eligibility(
 
 **Files:**
 - Create: `app/rules/refund.py`
-- Test: `tests/test_rules_refund.py`
+- Test: `tests/rules/test_refund.py`
 
 ```python
 @dataclass(frozen=True)
@@ -117,7 +117,7 @@ def compute_amount(
 
 **Files:**
 - Create: `app/graph/rules_exit.py`
-- Test: `tests/test_rules_graph.py`
+- Test: `tests/graph/rules/test_graph.py`
 
 **Step 1: 9 个节点全用 `_stub`**，边按 spec 转移表写；守卫各是一个函数。
 
@@ -144,7 +144,7 @@ def compute_amount(
 
 ### Task 5: `intake` 与 `need_info`
 
-**Files:** Modify `app/graph/rules_exit.py`；Test `tests/test_rules_intake.py`
+**Files:** Modify `app/graph/rules_exit.py`；Test `tests/graph/rules/test_intake.py`
 
 - `intake`：正则 `(?<!\d)(\d{4,})(?!\d)` 抽订单号；抽到清空 `pending_question`
 - `need_info`：缺单号 → `list_user_orders` 取最近 3 单，
@@ -161,7 +161,7 @@ def compute_amount(
 
 ### Task 6: `extract`（模型抽要素）
 
-**Files:** Modify `app/core/prompts.py`、`app/graph/rules_exit.py`；Test `tests/test_rules_extract.py`
+**Files:** Modify `app/core/prompts.py`、`app/graph/rules_exit.py`；Test `tests/graph/rules/test_extract.py`
 
 ```python
 EXTRACT_PARAMETERS = {
@@ -187,7 +187,7 @@ EXTRACT_PARAMETERS = {
 
 ### Task 7: `validate`
 
-**Files:** Modify `app/graph/rules_exit.py`；Test `tests/test_rules_validate.py`
+**Files:** Modify `app/graph/rules_exit.py`；Test `tests/graph/rules/test_validate.py`
 
 三个守卫：要素齐全、订单属于本人、日期不矛盾。`condition_ok` 缺失**不拦**（交给 judge）。
 
@@ -204,7 +204,7 @@ EXTRACT_PARAMETERS = {
 
 ### Task 8: `query_data`（订单 + 政策）
 
-**Files:** Modify `app/graph/rules_exit.py`；Test `tests/test_rules_query.py`
+**Files:** Modify `app/graph/rules_exit.py`；Test `tests/graph/rules/test_query.py`
 
 ```python
 # 先复用 validate 写的快照；只有缺失时才补查
@@ -225,7 +225,7 @@ evidence = await retrieval.search(f"退款 {中文原因} {order.status}", top_k
 
 ### Task 9: `judge`（模型判资格）
 
-**Files:** Modify `app/core/prompts.py`、`app/graph/rules_exit.py`；Test `tests/test_rules_judge.py`
+**Files:** Modify `app/core/prompts.py`、`app/graph/rules_exit.py`；Test `tests/graph/rules/test_judge.py`
 
 **Step 1: prompt**
 
@@ -253,7 +253,7 @@ evidence = await retrieval.search(f"退款 {中文原因} {order.status}", top_k
 
 ### Task 10: `compliance`（红线 + 独立复算）
 
-**Files:** Modify `app/graph/rules_exit.py`；Test `tests/test_rules_compliance.py`
+**Files:** Modify `app/graph/rules_exit.py`；Test `tests/graph/rules/test_compliance.py`
 
 **前置**：实现 `compute` 节点（计划漏了）——`compute_amount` 只是纯函数，
 流水线里得有人调它，否则 `refund_amount` 永远是空的，红线 2 会误伤所有可退单。

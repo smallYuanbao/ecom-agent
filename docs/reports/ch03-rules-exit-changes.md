@@ -24,6 +24,7 @@
 | 16 | 2026-11-02 | Task 11 · `respond` + 接入主图 | 未提交 |
 | 17 | 2026-11-02 | Task 12 · 判定评测 + 金额对拍 | 未提交 |
 | 18 | 2026-11-03 | Task 13 · 验收 | 未提交 |
+| 19 | 2026-11-03 | 跨章 · 测试目录按 `app/` 分层重组 | 未提交 |
 
 ---
 
@@ -764,3 +765,41 @@ rules:compliance / rules:respond    ← 每个 3 行
 - `uv run python scripts/eval_refund.py` → 简单 100% / 困难 7/10 / 金额 10/10
 - `uv run ruff check app tests scripts` → All checks passed
 - 延迟实测：5 轮全部 `route=rules`，4.34–4.72s
+
+---
+
+## 19 · 跨章 · 测试目录按 `app/` 分层重组（未提交）
+
+### 修改与原因
+
+| 项 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+|---|---|---|---|
+| 目录结构 | 29 个文件平铺在 `tests/` 根目录，靠 `test_rules_*` 前缀区分 | 按 `app/` 分层：`db/`、`core/`、`rules/`、`graph/`、`graph/rules/`、`api/`、`eval/`、`docs/` | 文件到 29 个后，前缀只能分"退款相关"，分不出数据层 / 图 / API；Ch04 会继续往根目录堆 |
+| 文件命名 | `test_rules_intake.py` | `tests/graph/rules/test_intake.py` | 目录已表达层级，文件名不用再带 `rules_` 前缀 |
+| `tests/db/test_seed.py` | 用 `sys.path.insert(parent.parent)` 找仓库根 | 删除（`pyproject.toml` 已有 `pythonpath = ["."]`） | 搬进子目录后 `parent.parent` 变成 `tests/`，import 会断；那行本来就是冗余的 |
+| `tests/eval/test_refund_gold*.py`、`tests/docs/test_docs_consistency.py` | `Path(__file__).parents[1]` 定位仓库根 | `parents[2]` | 多了一层目录，旧算法会指到 `tests/` |
+| `00-tasks.md` 等 live 文档 | 引用旧的 `tests/test_*.py` | 同步为新路径 | `test_docs_consistency` 当场报 P1-8 产出不存在——守卫正常工作 |
+
+### 为什么按 `app/` 而不是按章
+
+章是"什么时候写的"，测试按"测什么"组织。同一个文件会跨章改
+（`test_models.py` 从 Ch01 改到 Ch03），按章分会让每次修改都产生 `git mv` 和链接失效。
+
+### 没做什么
+
+- **没有按 unit / integration 分目录**：一个文件常同时包含两类；需要跑子集时用 `-k` 或 marker。
+- **没有改测试逻辑**：纯搬移 + 修路径，断言一行没动。
+- **历史改动记录里的旧路径不改**：按"只增不改"约定，那些记录的是当时的路径。
+
+### 新增
+
+| 文件 | 内容 |
+|---|---|
+| `tests/README.md` | 目录约定、常用命令、新增测试的放置规则 |
+
+### 验证
+
+- `uv run pytest -q` → 586 passed, 42 skipped（与重组前一致）
+- `uv run pytest tests/graph/rules -q` → 188 passed
+- `uv run pytest tests/db -q` → 31 passed
+- `uv run ruff check app tests scripts` → All checks passed

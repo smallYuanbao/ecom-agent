@@ -64,7 +64,7 @@ pythonpath = ["."]
 **Files:**
 - Create: `app/db/base.py`
 - Create: `app/db/session.py`
-- Test: `tests/test_session.py`
+- Test: `tests/db/test_session.py`
 
 **Interfaces:**
 
@@ -124,7 +124,7 @@ Path("data").mkdir(exist_ok=True)   # 放在 engine 创建之前
 
 `test_session.py`：连一次库，`SELECT 1`；断言 `PRAGMA foreign_keys` 返回 1。
 
-**验收**：`uv run pytest tests/test_session.py -q` 绿。
+**验收**：`uv run pytest tests/db/test_session.py -q` 绿。
 
 **Commit:** `feat(db): engine + session 工厂 + SQLite PRAGMA`
 
@@ -134,7 +134,7 @@ Path("data").mkdir(exist_ok=True)   # 放在 engine 创建之前
 
 **Files:**
 - Create: `app/db/models.py`
-- Test: `tests/test_models.py`
+- Test: `tests/db/test_models.py`
 
 **Interfaces:** 10 个模型类，字段与 `app/db/schema.sql` 一致。
 
@@ -202,7 +202,7 @@ sqlite3 data/app.db ".indexes messages"  # 含 uk_msg_idem
 
 **Files:**
 - Create: `app/db/repo_order.py`
-- Test: `tests/test_repo_order.py`
+- Test: `tests/db/test_repo_order.py`
 
 **Interfaces:**
 
@@ -258,7 +258,7 @@ async def get_order(order_id: str, *, user_id: str,
 **Files:**
 - Create: `app/db/repo_conversation.py`
 - Create: `app/db/repo_message.py`
-- Test: `tests/test_repo_message.py`
+- Test: `tests/db/test_repo_message.py`
 
 **Interfaces:**
 

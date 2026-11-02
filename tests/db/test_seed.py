@@ -3,12 +3,8 @@
 不测"能不能写进库"（那是 init_db/seed 脚本的事），只测**数据本身的形状**：
 状态齐不齐、每人几单、有没有过期券、有没有超期单。
 """
-import sys
 from collections import Counter
 from datetime import timedelta
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from scripts.seed import (
     COUPONS,

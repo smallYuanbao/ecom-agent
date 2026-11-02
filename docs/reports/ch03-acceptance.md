@@ -24,7 +24,7 @@
 | 5 | 金额对拍 10/10 | ✅ **10/10** | 同上 |
 | 6 | 9 状态可达 | ✅ | `test_all_nine_nodes_reachable_from_entry` |
 | 7 | 17 条转移各有测试 | ✅ | `test_edge_table_matches_spec` + 各守卫单测 |
-| 8 | 四类转人工各一条 | ✅ | `tests/test_rules_transfer_paths.py`（6 条） |
+| 8 | 四类转人工各一条 | ✅ | `tests/graph/rules/test_transfer_paths.py`（6 条） |
 | 9 | 端到端 P95 < 30s | ✅ **4.72s**（n=5） | 见下「延迟」 |
 | 10 | `00-tasks.md` P3 勾选 | ✅ 13/13 | `docs/superpowers/plans/00-tasks.md` |
 

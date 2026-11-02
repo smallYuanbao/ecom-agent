@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-DOCS = Path(__file__).resolve().parents[1] / "docs"
+DOCS = Path(__file__).resolve().parents[2] / "docs"
 TASKS = DOCS / "superpowers/plans/00-tasks.md"
 
 # 只有这些前缀算"仓库内的产出路径"，其余（如 `data/app.db` 运行产物）不校验

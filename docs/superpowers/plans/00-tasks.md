@@ -28,7 +28,7 @@
 | P1-5 | messages repository | M1、C1、K4 | `app/db/repo_message.py` | 支持 `status` 与 `client_message_id`，重复键返回首次 id | ✅ |
 | P1-6 | orders/stock/coupons 仓库（**落表，不 mock**） | S1、数据设计 | `app/db/repo_order.py` | **`user_id` 必填**，越权返回 NotFound | ✅ |
 | P1-7 | seed 脚本 | 数据设计 §四/§五 | `scripts/seed.py` | 6 SKU / 20 订单 / 5 券，重复执行不翻倍 | ✅ |
-| P1-8 | P1 测试 | S1 | `tests/test_models.py`、`tests/test_repo_order.py`、`tests/test_repo_message.py`、`tests/test_seed.py` | 越权、必填参数、幂等索引、seed 覆盖度 | ✅ |
+| P1-8 | P1 测试 | S1 | `tests/db/test_models.py`、`tests/db/test_repo_order.py`、`tests/db/test_repo_message.py`、`tests/db/test_seed.py` | 越权、必填参数、幂等索引、seed 覆盖度 | ✅ |
 
 **阶段验收**：`python scripts/init_db.py && python scripts/seed.py` 后，`get_order("2001", user_id="u1")` 抛 NotFound。✅ 已验证
 
@@ -135,13 +135,13 @@ B（数据）待 Ch04、C（规则）待 Ch03。
 
 | # | 任务 | 依据 | 产出 | 验收 | 状态 |
 |---|---|---|---|---|---|
-| P6-1 | 归属校验测试补全 | S1 | `tests/test_security.py` | 越权 3 例 | ⏳ |
+| P6-1 | 归属校验测试补全 | S1 | `tests/security/test_security.py` | 越权 3 例 | ⏳ |
 | P6-2 | 会话归属 404 | S2 | `app/api/chat.py` | 猜 id 返回 404 | ⏳ |
 | P6-3 | Prompt 四区结构 | S3 | `app/core/prompts.py` | 用户/检索/工具内容包裹 | ⏳ |
 | P6-4 | 工具校验装饰器 | S4 | `app/tools/decorators.py` | 统一注入+校验 | ⏳ |
 | P6-5 | 输出检查（金额/措辞）。**机械校验优先**：金额必须等于 `compute` 输出、订单字段必须来自工具返回值，不用模型判 | S6 | `app/core/output_guard.py` | 违规回答被改写；两条机械校验各有反向用例 | ⏳ |
 | P6-6 | 日志收口 + 密钥检查 | S5 | `app/core/logging.py` | 日志里搜不到 key | ⏳ |
-| P6-7 | 五个必测场景 | S1–S6 | `tests/test_security.py` | 全部通过 | ⏳ |
+| P6-7 | 五个必测场景 | S1–S6 | `tests/security/test_security.py` | 全部通过 | ⏳ |
 
 ---
 

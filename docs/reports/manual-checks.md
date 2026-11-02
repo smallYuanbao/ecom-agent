@@ -44,7 +44,7 @@ uv run python scripts/try.py graph  "你想试的句子"
 ### ✅ Task 1 · 主图骨架
 
 ```bash
-uv run pytest tests/test_graph_smoke.py -v          # 期望 17 passed
+uv run pytest tests/graph/test_graph_smoke.py -v          # 期望 17 passed
 uv run python scripts/try.py graph "随便说点什么"
 ```
 
@@ -53,7 +53,7 @@ uv run python scripts/try.py graph "随便说点什么"
 ### ✅ Task 2 · 意图分类
 
 ```bash
-uv run pytest tests/test_intent.py -v               # 期望 16 passed（12/12 命中）
+uv run pytest tests/graph/test_intent.py -v               # 期望 16 passed（12/12 命中）
 uv run python scripts/try.py intent "我买的推车能退吗"
 ```
 
@@ -83,7 +83,7 @@ uv run python scripts/try.py intent "订单 1001 能退吗，顺便看看 ST-20 
 ### ⏳ Task 3 · 路由与占位出口测试
 
 ```bash
-uv run pytest tests/test_routing.py -v
+uv run pytest tests/graph/test_routing.py -v
 ```
 
 **该看到**：12 意图逐个断言 → 5 出口；每个出口返回自己的那句话（不串行）。
@@ -104,7 +104,7 @@ curl -s "localhost:8000/api/v2/tenants/default_tenant/databases/default_database
 ### ⏳ Task 5 · 混合检索
 
 ```bash
-uv run pytest tests/test_retrieval.py -v
+uv run pytest tests/core/test_retrieval.py -v
 uv run python scripts/try.py retrieve "退货政策是什么"
 ```
 
@@ -113,7 +113,7 @@ uv run python scripts/try.py retrieve "退货政策是什么"
 ### ⏳ Task 6 · 证据闸
 
 ```bash
-uv run pytest tests/test_gate.py -v
+uv run pytest tests/core/test_gate.py -v
 uv run python scripts/try.py gate "退货政策是什么"      # 应通过
 uv run python scripts/try.py gate "你们老板是谁"        # 应不通过
 ```
@@ -127,7 +127,7 @@ sqlite3 data/app.db "select id, question, source, retrieved from low_conf_questi
 ### ⏳ Task 7 · 知识出口
 
 ```bash
-uv run pytest tests/test_knowledge_node.py -v
+uv run pytest tests/graph/test_knowledge_node.py -v
 uv run python scripts/try.py graph "退货政策是什么"
 ```
 
@@ -138,7 +138,7 @@ uv run python scripts/try.py graph "退货政策是什么"
 ### ⏳ Task 8 · D / E 出口
 
 ```bash
-uv run pytest tests/test_human_fallback.py -v
+uv run pytest tests/graph/test_human_fallback.py -v
 uv run python scripts/try.py graph "你们这什么破服务"
 uv run python scripts/try.py graph "在吗"
 uv run python scripts/try.py graph "谢谢"
