@@ -11,6 +11,7 @@
 | [ch01-data-foundation-changes.md](./ch01-data-foundation-changes.md) | 数据地基：10 表、seed、越权 |
 | [ch02-walking-skeleton-changes.md](./ch02-walking-skeleton-changes.md) | 主流程骨架：意图、路由、检索、知识出口 |
 | [ch03-rules-exit-changes.md](./ch03-rules-exit-changes.md) | C 出口：退款 9 状态流水线、判定、评测 |
+| [ch04-data-exit-changes.md](./ch04-data-exit-changes.md) | B 出口：订单 / 物流 / 库存查询 |
 
 ## 二、验收报告（一章做完时写）
 

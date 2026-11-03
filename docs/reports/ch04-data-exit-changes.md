@@ -1,0 +1,50 @@
+# Ch04 · B 出口（数据查询） · 改动记录
+
+> 对应 spec：[ch04-data-exit-design.md](../superpowers/specs/ch04-data-exit-design.md)
+> 对应 plan：[ch04-data-exit.md](../superpowers/plans/ch04-data-exit.md)
+> 格式说明见 [00-change-log-overview.md](./00-change-log-overview.md)
+
+| # | 日期 | 任务 | commit |
+|---|---|---|---|
+| 1 | 2026-11-03 | Task 1 · 共享代码抽取 | `6563952` |
+
+---
+
+## 1 · Task 1 · 共享代码抽取（`6563952`）
+
+### 新增
+
+| 文件 | 内容 |
+|---|---|
+| `app/core/format.py` | `yuan_text(cents)`：分 → 「1249.00 元」，整数运算 |
+| `app/graph/params.py` | `ORDER_ID_RE` / `SKU_RE`、`extract_order_id` / `extract_sku` |
+| `app/graph/order_select.py` | `CANDIDATE_LIMIT`、`candidate(order)`、`ask_order(state)` |
+| `app/graph/tracing.py` | `traced(prefix, name, node)`：子图节点的 span 包装 |
+| `tests/core/test_format.py` | 7 条：金额格式 + 大数精度 |
+| `tests/graph/test_params.py` | 16 条：订单号 / SKU 提取 |
+| `tests/graph/test_order_select.py` | 5 条：候选形状、降级、不写 `validate_retry` |
+
+### 修改与原因
+
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+|---|---|---|---|
+| `rules_exit.py` · `ORDER_ID_RE` / `extract_order_id` | 定义在 C 出口模块里 | 搬到 `graph/params.py` | B 出口也要抽订单号；留在 C 里会让 B import C，形成反向依赖 |
+| `rules_exit.py` · `yuan_text` | 定义在 C 出口模块里 | 搬到 `core/format.py` | 金额格式是跨出口的展示约定，不是退款逻辑 |
+| `rules_exit.py` · `_candidate` / `_ask_order` | 私有函数，B 用不到 | `graph/order_select.py` 的 `candidate` / `ask_order` | B 和 C 都要"缺单号列候选"，复制会立刻产生两套话术 |
+| `rules_exit.py` · `_traced` | 每个子图各写一份 | `graph/tracing.py` 的 `traced(prefix, name, node)` | B 子图也要逐节点 span；复制粘贴容易把 span 名写错 |
+| `tests/graph/rules/*` | patch `rules_exit.list_user_orders` / `record_span` | patch `order_select.list_user_orders` / `tracing.record_span` | 函数搬家后，patch 旧位置不会生效——测试会静默失效 |
+
+### 两个搬移时的细节
+
+**1. `ask_order` 不写 `validate_retry`。** 那是 C 出口自己的重试计数，B 不关心。
+共享函数只返回追问载荷，C 在外面加自己的字段。
+
+**2. `traced` 多一个 `name` 参数。** 原 `_traced(name, node)` 里的 `name` 是节点键名；
+共享版需要区分前缀（`rules` / `data`）和节点名，所以签名是 `traced(prefix, name, node)`。
+span 名仍是 `rules:intake`，没有变化。
+
+### 验证
+
+- `uv run pytest -q` → 618 passed, 42 skipped
+- `uv run ruff check app tests` → All checks passed
+- C 出口测试一条未改（只改了 import 与 patch 位置），全绿说明搬移没改行为
