@@ -19,6 +19,7 @@
 |---|---|
 | [ch02-acceptance.md](./ch02-acceptance.md) | 主流程骨架验收 |
 | [ch03-acceptance.md](./ch03-acceptance.md) | 退款流水线验收：清单、指标、转人工路径、延迟、局限 |
+| [ch04-acceptance.md](./ch04-acceptance.md) | 数据查询验收：三类查询、边界场景、延迟、零模型调用 |
 
 ## 三、评测报告（有数据、有结论）
 

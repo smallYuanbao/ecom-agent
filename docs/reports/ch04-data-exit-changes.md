@@ -14,6 +14,7 @@
 | 6 | 2026-11-03 | Task 6 · 查询链与结果校验 | `09b06ce` |
 | 7 | 2026-11-04 | Task 7 · 模板化回答 | `bda6cae` |
 | 8 | 2026-11-04 | Task 8 · 接主图并删除占位 | `eaf57f4` |
+| 9 | 2026-11-04 | Task 9 · 验收 | `3cf6f1d` |
 
 ---
 
@@ -296,3 +297,42 @@ span 名仍是 `rules:intake`，没有变化。
 - `uv run pytest -q` → 697 passed, 42 skipped（减少了 8 条占位/数据出口断言）
 - `uv run ruff check app tests` → All checks passed
 - `scripts/try.py graph` 三条真实请求全部命中 `route=data`
+
+---
+
+## 9 · Task 9 · 验收（`3cf6f1d`）
+
+### 新增
+
+| 文件 | 内容 |
+|---|---|
+| `docs/reports/ch04-acceptance.md` | 验收清单、三条实测、边界场景、延迟、已知限制 |
+
+### 修改与原因
+
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+|---|---|---|---|
+| `order_select.py` · `ask_order` | 只有一种追问话术 | 加 `not_found` 参数，报错单号时先说「没有找到这笔订单」 | 验收要求"越权与不存在同一句"，原话术只列候选，用户不知道是号错了还是系统没查到 |
+| `data_exit.py` · `need_info` | 直接 `ask_order(state)` | 按 `tool_code == "not_found"` 传入标记 | 同一函数要区分"用户没给号"与"给的号查不到" |
+| `test_graph.py` | 无零模型守卫 | `test_data_exit_does_not_import_llm` 静态断言 | "B 出口零模型调用"是本章核心取舍，必须有守卫 |
+| `00-tasks.md` · P4 | 5 项待做 | P4-1/2/4/5/6 完成；P4-3 建单仍待做 | 任务表要与实现一致 |
+
+### 验收结果
+
+| 项 | 结果 |
+|---|---|
+| pytest | **706 passed, 39 skipped** |
+| 三条 happy path | ✅ 全部 `route=data` |
+| 缺单号列候选 | ✅ 3 个候选 + `select_order` |
+| 越权与不存在同一句 | ✅「没有找到这笔订单…」+ 同一批候选 |
+| 四种货态 | ✅ 有货 / 暂时无货 / 已售罄 / 预售中 |
+| 待发货查物流 | ✅「暂无物流信息」 |
+| span | ✅ `data:extract_params/validate/query/need_info/format` |
+| 零模型调用 | ✅ 模块不 import `app.core.llm` |
+| 延迟 | median **0.98s**（n=5，预算 30s） |
+
+### 验证
+
+- `uv run pytest -q` → 706 passed, 39 skipped
+- `uv run ruff check app tests` → All checks passed
+- `scripts/try.py graph` 三条 happy path + 三条边界场景符合预期
