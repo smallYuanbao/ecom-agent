@@ -11,6 +11,7 @@
 | 3 | 2026-11-03 | Task 3 · 5 状态子图骨架 | `3998ed6` |
 | 4 | 2026-11-03 | Task 4 · 抽参数与按意图校验 | `c43e1d2` |
 | 5 | 2026-11-03 | Task 5 · 缺参列候选 | `fa214d0` |
+| 6 | 2026-11-03 | Task 6 · 查询链与结果校验 | `09b06ce` |
 
 ---
 
@@ -188,4 +189,42 @@ span 名仍是 `rules:intake`，没有变化。
 
 - `uv run pytest tests/graph/data -q` → 40 passed
 - `uv run pytest -q` → 677 passed, 42 skipped
+- `uv run ruff check app tests` → All checks passed
+
+---
+
+## 6 · Task 6 · 查询链与结果校验（`09b06ce`）
+
+### 新增
+
+| 文件 | 内容 |
+|---|---|
+| `app/graph/transfer.py` | `TRANSFER_TEXT` / `TRANSFER_ACTION` / `transfer(reason)`，B / C 共用 |
+| `tests/graph/data/test_query.py` | 17 条：三类查询、规格匹配、失败分流 |
+
+### 修改与原因
+
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+|---|---|---|---|
+| `data_exit.py` · `query` | `_stub` 返回空 | 按意图分派；物流走两级链；库存先列规格再匹配 | 没有查询，`format` 没有数据可拼 |
+| `data_exit.py` · 结果校验 | 计划放在 `after_query` 守卫 | 放在 `query` 内，缺字段置 `internal` + 写转人工载荷 | 守卫只能返回键，写不了话术；放在节点里能同时写码和载荷 |
+| `rules_exit.py` · `_transfer` | C 出口私有 | 搬到 `graph/transfer.py`，B / C 共用 | B 也要转人工；从 C import 会形成反向依赖 |
+| spec / plan | 结果校验写在守卫 | 改为 `query` 内 | 同上 |
+
+### 三个设计点
+
+**1. 规格匹配取最长命中。** 「我要星光灰」不能匹配成「灰」；
+只有一个规格时用户不说也能确定；多规格且没命中 → 追问，不猜。
+
+**2. 失败分流按"用户能不能补"分。**
+`not_found` / `invalid_arg` → 追问；`timeout` / `internal` → 转人工。
+追问的话术里能点名缺什么，用户补一轮就能继续。
+
+**3. 无物流单号不是错误。** 待发货订单 `tracking_no` 为 NULL，
+`data_result.tracking = None`，`format` 会说「暂无物流信息」，而不是 `not_found`。
+
+### 验证
+
+- `uv run pytest tests/graph/data -q` → 57 passed
+- `uv run pytest -q` → 694 passed, 42 skipped
 - `uv run ruff check app tests` → All checks passed
