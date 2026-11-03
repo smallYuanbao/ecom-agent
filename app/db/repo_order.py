@@ -57,6 +57,32 @@ async def get_stock(
         return (await s.scalars(stmt)).first()
 
 
+async def list_stock_by_sku(
+    sku_id: str, *, session: AsyncSession | None = None
+) -> list[Stock]:
+    """列某型号的全部规格，价格升序。
+
+    用户只报型号、没报规格时用：先拿全部规格，再拿原话去匹配。
+    """
+    async with session_scope(session) as s:
+        stmt = (
+            select(Stock)
+            .where(Stock.sku_id == sku_id)
+            .order_by(Stock.price.asc(), Stock.spec.asc())
+        )
+        return list((await s.scalars(stmt)).all())
+
+
+async def list_stock(*, session: AsyncSession | None = None) -> list[Stock]:
+    """列全部库存行，按型号 + 规格排序。
+
+    缺型号时列候选用；数据量很小（6 行），不需要分页。
+    """
+    async with session_scope(session) as s:
+        stmt = select(Stock).order_by(Stock.sku_id.asc(), Stock.spec.asc())
+        return list((await s.scalars(stmt)).all())
+
+
 async def get_coupons(*, user_id: str, session: AsyncSession | None = None) -> list[Coupon]:
     """取某用户的券，快过期的在前。"""
     async with session_scope(session) as s:

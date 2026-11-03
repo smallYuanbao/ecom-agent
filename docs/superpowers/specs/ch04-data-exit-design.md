@@ -217,8 +217,11 @@
 async def query_order(order_id: str, *, user_id: str) -> ToolResult
 async def query_logistics(tracking_no: str, *, user_id: str) -> ToolResult
 async def query_stock(sku_id: str, spec: str | None = None) -> ToolResult
-async def list_orders(*, user_id: str) -> ToolResult
+async def list_stock_skus() -> ToolResult
 ```
+
+**订单候选不在这里重复提供**：`need_info` 复用 `order_select.ask_order`
+（它已经封装了 `list_user_orders` 与候选形状），工具层只负责三类查询。
 
 **为什么还要工具层，而不直接调 repo**：统一错误语义。
 repo 抛 `NotFound`，工具层转成 `ToolResult(code=...)`，图里只做分支，不做异常处理。

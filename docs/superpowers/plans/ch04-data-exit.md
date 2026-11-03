@@ -111,7 +111,6 @@ async def query_order(order_id: str, *, user_id: str, session=None) -> ToolResul
 async def query_logistics(tracking_no: str, *, user_id: str, session=None) -> ToolResult
 async def query_stock(sku_id: str, spec: str | None = None, *, session=None) -> ToolResult
 async def list_stock_skus(*, session=None) -> ToolResult
-async def list_orders(*, user_id: str, session=None) -> ToolResult
 ```
 
 | 函数 | 逻辑 | `data` 形状 |
@@ -121,7 +120,9 @@ async def list_orders(*, user_id: str, session=None) -> ToolResult
 | `query_stock(spec=None)` | 列出该型号全部规格 | `{sku_id, rows:[{spec,stock,price,status}]}` |
 | `query_stock(spec=...)` | 精确查一行 | `{sku_id,spec,stock,price,status}` |
 | `list_stock_skus` | 去重的型号列表（缺型号时列候选） | `{skus:["ST-20",...]}` |
-| `list_orders` | 最近 3 单，转候选形状 | `{candidates:[...]}` |
+
+**订单候选不重复实现**：`need_info` 复用 `order_select.ask_order`，
+它已经封装了 `list_user_orders` 与候选形状。
 
 **Step 3: 错误映射**
 
