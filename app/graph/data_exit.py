@@ -11,11 +11,13 @@ extract_params ─► validate ─┬─► query ─┬─► format ─► END
 
 **「转人工」不是节点**：主图已有 `human` 出口，子图把转人工写成一条边到 `END`。
 """
+from datetime import datetime
 from typing import Any
 
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
+from app.core.format import yuan_text
 from app.graph.order_select import ask_order
 from app.graph.params import extract_order_id, extract_sku
 from app.graph.state import ConversationState
@@ -159,7 +161,7 @@ async def query(state: ConversationState) -> dict:
             data["tracking"] = tracking.data
 
         if not _complete_tracking(data):
-            return transfer("data_incomplete")
+            return transfer("data_incomplete") # 数据不完整
         return {"tool_code": "ok", "data_result": data}
 
     if intent == "库存价格":
@@ -178,6 +180,87 @@ async def query(state: ConversationState) -> dict:
         return {"tool_code": "ok", "data_result": row}
 
     # 理论到不了（路由只把三个数据意图送进来）；fail-closed
+    return transfer("unsupported_intent")
+
+
+# ── format · 组装回答 ──────────────────────────────────────
+
+
+def _time_text(value: str | None) -> str:
+    """ISO 时间 → 「2026-10-29 10:00」；解析失败原样返回。"""
+    if not value:
+        return ""
+    try:
+        return datetime.fromisoformat(value).strftime("%Y-%m-%d %H:%M")
+    except ValueError:
+        return value
+
+
+def _stock_text(stock: int, status: str) -> str:
+    """库存状态 → 人话。`on_sale` 且 0 件也算"暂时无货"。"""
+    if status == "sold_out":
+        return "已售罄"
+    if status == "presale":
+        return "预售中"
+    if status == "on_sale" and stock > 0:
+        return f"有货（{stock} 件）"
+    return "暂时无货"
+
+
+def _recent_nodes(nodes: list[dict]) -> str:
+    """取最近 3 条，按时间倒序拼成人话。"""
+    recent = list(reversed(nodes[-3:]))
+    return "；".join(
+        f"{node.get('time', '')} {node.get('status', '')} {node.get('desc', '')}".strip()
+        for node in recent
+    )
+
+
+async def format(state: ConversationState) -> dict:
+    """把 `data_result` 拼成人话。
+
+    **模板里所有数字都来自工具返回值**：金额统一 `yuan_text`，不做二次计算。
+    """
+    intent = state.get("intent")
+    data = state.get("data_result") or {}
+
+    if intent == "订单查询":
+        text = (
+            f"订单 {data['order_id']}：状态 {data['status']}；"
+            f"实付 {yuan_text(data['amount'])}；"
+            f"下单时间 {_time_text(data['created_at'])}。"
+        )
+        if data.get("tracking_no"):
+            text += f"物流单号 {data['tracking_no']}。"
+        return {"answer": text, "is_placeholder": False}
+
+    if intent == "物流查询":
+        tracking = data.get("tracking")
+        if tracking is None:
+            order = data.get("order") or {}
+            return {
+                "answer": (
+                    f"订单 {order.get('order_id')} 当前状态：{order.get('status')}，"
+                    "暂无物流信息。"
+                ),
+                "is_placeholder": False,
+            }
+        text = f"快递 {tracking['tracking_no']}：最新状态 {tracking['latest_status']}。"
+        recent = _recent_nodes(tracking.get("nodes") or [])
+        if recent:
+            text += f"最近轨迹：{recent}。"
+        return {"answer": text, "is_placeholder": False}
+
+    if intent == "库存价格":
+        return {
+            "answer": (
+                f"{data['sku_id']} {data['spec']}："
+                f"{_stock_text(data['stock'], data['status'])}，"
+                f"售价 {yuan_text(data['price'])}。"
+            ),
+            "is_placeholder": False,
+        }
+
     return transfer("unsupported_intent")
 
 
@@ -285,6 +368,7 @@ def build_data_graph() -> CompiledStateGraph:
         "validate": validate,
         "query": query,
         "need_info": need_info,
+        "format": format,
     }
     for name in NODE_NAMES:
         graph.add_node(name, traced("data", name, real_nodes.get(name, _stub)))
