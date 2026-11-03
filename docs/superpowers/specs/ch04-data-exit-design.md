@@ -231,6 +231,12 @@ class ToolResult:
     data: dict | None
 ```
 
+**需要给 `repo_order` 增加 `list_stock_by_sku(sku_id)`**：`get_stock` 要求同时给规格，
+而"用户只报了型号"时需要先列出该型号的所有规格，再匹配原话。
+
+**`session` 可注入**：工具函数加 `session: AsyncSession | None = None`（keyword-only），
+测试传临时库的 session，生产不传。沿用 `session_scope()` 的约定。
+
 **身份注入**：`user_id` 是 keyword-only 必填，由**图传入**，不是模型传入。
 B 出口没有模型参与工具选择，所以不存在"模型伪造 user_id"的路径；
 这条规则保留是为了与 D7 一致，也为将来若接 Agent 做兜底。
@@ -264,6 +270,7 @@ B 出口没有模型参与工具选择，所以不存在"模型伪造 user_id"�
 | `rules_exit.yuan_text` | `app/core/format.py` | B / C |
 | `rules_exit._candidate` / `_ask_order` | `app/graph/order_select.py` | B / C |
 | `rules_exit.extract_order_id` | `app/graph/params.py` | B / C |
+| `rules_exit._traced` | `app/graph/tracing.py` | B / C（span 命名加前缀） |
 
 **为什么现在抽**：B 出口要复用同样的"列候选"和"金额格式"，复制会立刻产生两份话术。
 这是**纯搬移**，C 的行为不变，由现有测试兜住。
