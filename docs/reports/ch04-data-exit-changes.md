@@ -13,6 +13,7 @@
 | 5 | 2026-11-03 | Task 5 · 缺参列候选 | `fa214d0` |
 | 6 | 2026-11-03 | Task 6 · 查询链与结果校验 | `09b06ce` |
 | 7 | 2026-11-04 | Task 7 · 模板化回答 | `bda6cae` |
+| 8 | 2026-11-04 | Task 8 · 接主图并删除占位 | `eaf57f4` |
 
 ---
 
@@ -263,3 +264,35 @@ span 名仍是 `rules:intake`，没有变化。
 - `uv run pytest tests/graph/data -q` → 68 passed
 - `uv run pytest -q` → 705 passed, 42 skipped
 - `uv run ruff check app tests` → All checks passed
+
+---
+
+## 8 · Task 8 · 接主图并删除占位（`eaf57f4`）
+
+### 修改与原因
+
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+|---|---|---|---|
+| `build.py` · `data` 节点 | `nodes.data_exit` 占位 | `build_data_graph()` 编译后子图 | 五个出口里最后一个占位，不接就跑不到真实查询 |
+| `nodes.py` · `data_exit` / `PLACEHOLDER_TEXT` / `_placeholder` | 占位机制 | 全部删除 | 已无消费者；留着会让后人以为还有出口没实现 |
+| `test_graph_smoke.py` · `offline` 夹具 | 只打桩分类/检索/生成 | 增加 `data_exit.list_stock_skus` 与 `order_select.list_user_orders` | 冒烟测试会用 `raw_query="测试"` 走所有意图；库存价格会触发真实数据库 |
+| `test_graph_smoke.py` · `test_no_exit_emits_amounts` | 所有出口都断言"无数字" | 改名并**排除 data** | 数据回答本来就该包含价格 / 库存 / 单号；"无数字"只适用于文字类出口 |
+
+### 两个设计点
+
+**1. 占位机制整体删除，不是逐个删。** `PLACEHOLDER_TEXT` 为空时，
+`_placeholder()` 已经没有意义；留着空表比删掉更容易误导。
+
+**2. 端到端三条实测**
+
+| 输入 | 路由 | 回答 |
+|---|---|---|
+| `订单1001 到哪了` | data / 物流 | 快递 SF1001001：最新状态 已签收。最近轨迹：… |
+| `订单1002 什么状态` | data / 订单 | 订单 1002：状态 已发货；实付 1249.00 元；… |
+| `ST-20 还有货吗` | data / 库存 | ST-20 石墨灰：有货（42 件），售价 1299.00 元。 |
+
+### 验证
+
+- `uv run pytest -q` → 697 passed, 42 skipped（减少了 8 条占位/数据出口断言）
+- `uv run ruff check app tests` → All checks passed
+- `scripts/try.py graph` 三条真实请求全部命中 `route=data`
