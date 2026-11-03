@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_msg_conv ON messages(conversation_id, created_at);
--- K4：部分索引，只对带幂等键的消息去重（多个 NULL 不算冲突）
+-- K4：部分索引，只对带幂等键的消息去重。
+-- SQLite 普通唯一索引也允许多 NULL；用 WHERE 是为了语义显式 + 跨库一致（SQL Server 只允许一个 NULL）
 CREATE UNIQUE INDEX IF NOT EXISTS uk_msg_idem
   ON messages(conversation_id, client_message_id)
   WHERE client_message_id IS NOT NULL;

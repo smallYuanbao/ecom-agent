@@ -65,7 +65,12 @@ async def test_idempotent_index_rejects_duplicate_client_message_id(session):
 
 
 async def test_partial_index_allows_multiple_null_client_message_id(session):
-    """部分索引的意义：没带幂等键的消息可以有任意多条。"""
+    """没带幂等键的消息可以有任意多条。
+
+    注意：SQLite 的**普通唯一索引也允许多条 NULL**（`NULL != NULL`）。
+    部分索引的价值在语义显式与跨库一致（SQL Server 只允许一个 NULL），
+    不是"让 NULL 能共存"。
+    """
     conv = Conversation(user_id="u1")
     session.add(conv)
     await session.flush()

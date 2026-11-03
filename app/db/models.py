@@ -78,7 +78,8 @@ class Message(Base):
 
     __table_args__ = (
         Index("idx_msg_conv", "conversation_id", "created_at"),
-        # K4 部分索引：只对带幂等键的消息去重；多个 NULL 不算冲突
+        # K4 部分索引：只对带幂等键的消息去重。
+        # SQLite 普通唯一索引也允许多 NULL；用 WHERE 是为了语义显式 + 跨库一致
         Index(
             "uk_msg_idem",
             "conversation_id",

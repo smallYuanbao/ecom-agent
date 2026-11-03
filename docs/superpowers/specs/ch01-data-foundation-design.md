@@ -352,7 +352,7 @@ sqlite3 data/app.db "select user_id, count(*) from orders group by 1;"
 | 业务数据 | **落表**，不用 mock 函数 | mock 函数（参考实现做法）：归属校验要能在 SQL 层做，函数里判断会退化 |
 | 越权返回 | 与"不存在"同异常 | 分开返回：会泄露"这个订单存在"（枚举 oracle） |
 | `user_id` 参数 | keyword-only、无默认值 | 可选参数：漏传时会静默放行 |
-| 幂等索引 | 部分索引 `WHERE client_message_id IS NOT NULL` | 普通唯一索引：多条 `NULL` 在 SQLite 里视为不同，需部分索引才符合语义 |
+| 幂等索引 | 部分索引 `WHERE client_message_id IS NOT NULL` | 普通唯一索引：**SQLite/PG/MySQL 也允许多 NULL**，但语义不显式，且 SQL Server 只允许一个 NULL；部分索引把"只对带键消息去重"写进 DDL |
 | 外键 | 连接时 `PRAGMA foreign_keys=ON` | 默认关闭：DDL 声明也不拦，必须显式开 + 反向测试验证 |
 | 表结构来源 | `schema.sql` 与 ORM 双写 | 只用 `create_all`：DDL 不可审阅；只用 SQL：ORM 类型对不上 |
 | 双写一致性 | `init_db.py` 自动比对表/列/索引 | 人工比对：会漏，且漏了没人发现 |

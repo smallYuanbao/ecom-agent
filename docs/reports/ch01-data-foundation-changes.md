@@ -14,6 +14,7 @@
 | 6 | 2026-10-28 | 会话与消息仓库 | `c76fbc8` |
 | 7 | 2026-10-28 | seed 脚本 | `2507d50` |
 | 8 | 2026-10-28 | 验收与收尾 | `bf8b503` |
+| 9 | 2026-11-03 | 补充：schema 比对接进 CI | 未提交 |
 
 ---
 
@@ -191,3 +192,31 @@
 - 从零建库 + seed → 10 表 / 7 索引 / 6 SKU / 20 单 / 5 券
 - `uv run pytest -q` → 30 passed
 - 越权手工验证：`get_order("2001", user_id="u1")` → `NotFound`；漏参 → `TypeError`
+
+---
+
+## 9 · 补充：schema 比对接进 CI（未提交）
+
+### 新增
+
+| 文件 | 内容 |
+|---|---|
+| `tests/db/test_schema_sync.py` | 两条：`schema.sql` 与 ORM 完全一致；两侧都定义了 10 张表 |
+
+### 修改与原因
+
+| 项 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+|---|---|---|---|
+| 漂移检查的触发 | 只有手动跑 `scripts/init_db.py` 时才比对 | `pytest` 每次都跑 | 脚本是手动的，没人跑就不会发现漂移；面试里说"防漂移"会被追问"CI 会跑吗" |
+| 空对空防护 | 无 | 断言两侧都有 10 张表 | 如果某一侧被整体清空，`diff` 会返回空列表——"一致"变成假象 |
+
+### 测试怎么做到不碰本地库
+
+- `schema_sql_objects()` 在**内存 sqlite** 里执行 `schema.sql`
+- `orm_objects()` 只读 `Base.metadata`
+- 两边都不连 `data/app.db`，所以测试不依赖本地库状态，也不会污染它
+
+### 验证
+
+- `uv run pytest tests/db/test_schema_sync.py -q` → 2 passed
+- `uv run pytest -q` → 588 passed, 42 skipped
