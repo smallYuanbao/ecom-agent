@@ -12,6 +12,7 @@
 | 4 | 2026-11-03 | Task 4 · 抽参数与按意图校验 | `c43e1d2` |
 | 5 | 2026-11-03 | Task 5 · 缺参列候选 | `fa214d0` |
 | 6 | 2026-11-03 | Task 6 · 查询链与结果校验 | `09b06ce` |
+| 7 | 2026-11-04 | Task 7 · 模板化回答 | `bda6cae` |
 
 ---
 
@@ -227,4 +228,38 @@ span 名仍是 `rules:intake`，没有变化。
 
 - `uv run pytest tests/graph/data -q` → 57 passed
 - `uv run pytest -q` → 694 passed, 42 skipped
+- `uv run ruff check app tests` → All checks passed
+
+---
+
+## 7 · Task 7 · 模板化回答（`bda6cae`）
+
+### 新增
+
+| 文件 | 内容 |
+|---|---|
+| `tests/graph/data/test_format.py` | 11 条：三个模板、四种货态、轨迹裁剪、兜底 |
+
+### 修改与原因
+
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+|---|---|---|---|
+| `data_exit.py` · `format` | `_stub` 返回空 | 按意图拼模板 | 流水线跑完没有面向用户的回答 |
+| `data_exit.py` · `_time_text` / `_stock_text` / `_recent_nodes` | 无 | 时间格式化、货态映射、轨迹裁剪 | 模板里不能直接塞 ISO 时间和原始状态码 |
+
+### 三个设计点
+
+**1. 模板只读 `data_result`，不做二次计算。** 金额用 `yuan_text`，
+库存数量直接来自工具，时间只做格式转换——保证"回答里的数字 = 数据库里的数字"。
+
+**2. 四种货态。** `on_sale` 有货 / `on_sale` 零库存 / `sold_out` / `presale`，
+分别对应「有货（N 件）」「暂时无货」「已售罄」「预售中」。
+
+**3. 轨迹取最近 3 条、倒序。** `nodes` 是按时间正序存的（seed 如此），
+展示时 `[-3:]` 再 `reversed`——用户关心的是最新的一条。
+
+### 验证
+
+- `uv run pytest tests/graph/data -q` → 68 passed
+- `uv run pytest -q` → 705 passed, 42 skipped
 - `uv run ruff check app tests` → All checks passed
