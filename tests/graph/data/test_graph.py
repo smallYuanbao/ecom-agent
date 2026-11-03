@@ -120,6 +120,17 @@ async def test_empty_walk_terminates():
     assert isinstance(result, dict)
 
 
+def test_data_exit_does_not_import_llm():
+    """B 出口内部零模型调用：整个模块不依赖 `app.core.llm`。"""
+    import inspect
+
+    from app.graph import data_exit
+
+    source = inspect.getsource(data_exit)
+    assert "app.core.llm" not in source
+    assert "structured_call" not in source
+
+
 async def test_each_node_writes_a_data_span(monkeypatch):
     spans: list[dict] = []
 

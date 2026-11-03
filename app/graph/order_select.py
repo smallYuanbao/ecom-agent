@@ -25,8 +25,11 @@ def candidate(order: Order) -> dict:
     }
 
 
-async def ask_order(state: ConversationState) -> dict:
+async def ask_order(state: ConversationState, *, not_found: bool = False) -> dict:
     """要订单号。有 `user_id` 就列最近 3 单；没有就退化成文字追问。
+
+    `not_found=True` 用于"用户报了一个查不到的号"：话术先说明没找到。
+    **不存在与越权走的是同一条路径、同一句话**，不泄露订单是否存在。
 
     只返回**追问载荷**，不写 `validate_retry`——那是 C 出口自己的计数。
     """
@@ -37,16 +40,26 @@ async def ask_order(state: ConversationState) -> dict:
         candidates = [candidate(order) for order in orders[:CANDIDATE_LIMIT]]
 
     if not candidates:
+        answer = (
+            "没有找到这笔订单，请核对订单号（在「我的订单」里可以看到）。"
+            if not_found
+            else "请提供一下订单号（在「我的订单」里可以看到）。"
+        )
         return {
             "pending_question": "order_id",
-            "answer": "请提供一下订单号（在「我的订单」里可以看到）。",
+            "answer": answer,
             "is_placeholder": False,
         }
 
+    answer = (
+        "没有找到这笔订单，您可以选一笔最近的订单："
+        if not_found
+        else "我查到您最近有这几笔订单，请问是哪一单？"
+    )
     return {
         "order_candidates": candidates,
         "pending_question": "order_id",
-        "answer": "我查到您最近有这几笔订单，请问是哪一单？",
+        "answer": answer,
         "actions": [{"type": "select_order", "candidates": candidates}],
         "is_placeholder": False,
     }

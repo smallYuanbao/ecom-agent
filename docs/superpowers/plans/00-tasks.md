@@ -85,17 +85,17 @@
 
 | # | 任务 | 依据 | 产出 | 验收 | 状态 |
 |---|---|---|---|---|---|
-| P4-1 | B 出口子图（参数校验 → 工具 → 结果校验） | 意图文档 | `app/graph/data_exit.py` | 查订单/物流/库存各 1 例 | ⏳ |
-| P4-2 | 工具实现（身份注入 + 归属校验） | D7、S4 | `app/tools/*.py` | 模型传的 user_id 被覆盖 | ⏳ |
+| P4-1 | B 出口子图（参数校验 → 工具 → 结果校验） | 意图文档 | `app/graph/data_exit.py` | 查订单/物流/库存各 1 例 | ✅ |
+| P4-2 | 工具实现（身份注入 + 归属校验） | D7、S4 | `app/tools/*.py` | `user_id` 由图传入；不存在与越权同为 `not_found` | ✅ |
 | P4-3 | D 出口 + `create_ticket`（确认 + 幂等） | D10、D11 | `app/tools/tickets.py` | 重复 request_id 只建一张 | ⚠️ 话术已完成，建单待做 |
 | P4-4 | E 出口三脚本 | 意图文档 §六 | `app/graph/nodes.py` | 三类输入各 1 例 | ✅ |
 | P4-5 | 兜底模板 + 落池 | 意图文档 §七 | `app/core/fallback.py` | 低置信问题进入 low_conf 表 | ✅ |
-| P4-6 | **B1 确定性工具链**：订单→物流两级依赖（先取 `tracking_no`）；缺 `order_id` 时列单让用户选 | 意图文档、D3 | `app/graph/data_exit.py` | 「订单 1001 到哪了」两步链跑通；无单号时 `list_user_orders` + interrupt 选单 | ⏳ |
+| P4-6 | **B1 确定性工具链**：订单→物流两级依赖（先取 `tracking_no`）；缺 `order_id` 时列单让用户选 | 意图文档、D3 | `app/graph/data_exit.py` | 「订单 1001 到哪了」两步链跑通；无单号时列候选 | ✅ |
 
-**阶段验收**：五个出口各有一条 happy path。
+**阶段验收**：五个出口各有一条 happy path ✅（A/C 已在 Ch02/Ch03 完成，B 在 Ch04 完成）。
 
-**当前状态**：A（知识）/ D（转人工）/ E（兜底）已有 happy path；
-B（数据）待 Ch04、C（规则）待 Ch03。
+**当前状态**：A（知识）/ B（数据）/ C（规则）/ D（转人工）/ E（兜底）全部有 happy path；
+D 的建单（P4-3）仍待做。
 
 ---
 

@@ -275,7 +275,9 @@ async def need_info(state: ConversationState) -> dict:
     """
     pending = state.get("pending_question")
     if pending == "order_id":
-        return await ask_order(state)
+        return await ask_order(
+            state, not_found=state.get("tool_code") == "not_found"
+        )
     if pending == "sku_id":
         return await _ask_sku()
     if pending == "spec":

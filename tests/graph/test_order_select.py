@@ -81,3 +81,26 @@ async def test_user_without_orders_falls_back_to_text(monkeypatch):
 
     assert result["pending_question"] == "order_id"
     assert "order_candidates" not in result
+
+
+async def test_not_found_wording_with_candidates(orders):
+    """报了一个查不到的号：先说明没找到，再列候选。"""
+    result = await order_select.ask_order({"user_id": "u1"}, not_found=True)
+
+    assert result["answer"].startswith("没有找到这笔订单")
+    assert result["order_candidates"]
+
+
+async def test_not_found_wording_without_candidates(monkeypatch):
+    async def _empty(*, user_id: str):
+        return []
+
+    monkeypatch.setattr(order_select, "list_user_orders", _empty)
+    result = await order_select.ask_order({"user_id": "u9"}, not_found=True)
+
+    assert result["answer"].startswith("没有找到这笔订单")
+
+
+async def test_default_wording_is_not_not_found(orders):
+    result = await order_select.ask_order({"user_id": "u1"})
+    assert result["answer"].startswith("我查到")

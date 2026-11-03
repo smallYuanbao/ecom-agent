@@ -46,6 +46,32 @@ async def test_order_candidates(monkeypatch):
     assert result["actions"][0]["type"] == "select_order"
 
 
+async def test_order_not_found_uses_not_found_wording(monkeypatch):
+    """报了一个查不到的号（或越权）：同一句话，不泄露是否存在。"""
+
+    async def _list(*, user_id: str):
+        return [fake_order("1001")]
+
+    monkeypatch.setattr(order_select, "list_user_orders", _list)
+
+    result = await need_info(
+        {"pending_question": "order_id", "user_id": "u1", "tool_code": "not_found"}
+    )
+
+    assert result["answer"].startswith("没有找到这笔订单")
+
+
+async def test_missing_order_id_uses_normal_wording(monkeypatch):
+    async def _list(*, user_id: str):
+        return [fake_order("1001")]
+
+    monkeypatch.setattr(order_select, "list_user_orders", _list)
+
+    result = await need_info({"pending_question": "order_id", "user_id": "u1"})
+
+    assert result["answer"].startswith("我查到")
+
+
 # ── 缺型号 ─────────────────────────────────────────────────
 
 
