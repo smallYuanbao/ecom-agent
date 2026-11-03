@@ -114,10 +114,10 @@ async def test_empty_walk_terminates():
 
     骨架阶段只要求"能终止"，不要求走对分支。
     """
-    # 全部 stub 不写任何字段，最终状态可能是 None 或空 dict；
-    # 这条只验证"能走完、不抛异常、不死循环"。
+    # 骨架阶段只验证"能走完、不抛异常、不死循环"，
+    # 不要求走对分支（Task 4 之后 validate 会写 pending_question）。
     result = await build_data_graph().ainvoke({})
-    assert result is None or result == {}
+    assert isinstance(result, dict)
 
 
 async def test_each_node_writes_a_data_span(monkeypatch):
