@@ -3,8 +3,7 @@
 **故意不调模型、不查向量库**——这里验证的是"接线对不对"。
 检索质量由 `scripts/eval_retrieval.py` 覆盖，生成质量由 `scripts/eval_knowledge.py`。
 
-当前实现进度：`knowledge` / `rules`（子图）、`human`（转接话术）、
-`fallback`（三脚本）已实现；只有 `data`（Ch04）仍是占位。
+当前实现进度：五个出口全部是真实实现（Ch04 完成）。
 """
 import re
 
@@ -13,9 +12,8 @@ import pytest
 from app.graph.build import EXIT_NODES, build_graph
 from app.graph.routing import INTENT_TO_ROUTE
 
-# 已实现的出口：不是占位。其余仍是占位。
-# knowledge（Ch02）、rules（Ch03）、human / fallback（Ch02）已实现。
-REAL_EXITS = frozenset({"knowledge", "rules", "human", "fallback"})
+# Ch04 之后五个出口全部实现，占位集合为空。
+REAL_EXITS = frozenset(EXIT_NODES)
 PLACEHOLDER_EXITS = frozenset(EXIT_NODES) - REAL_EXITS
 
 STRONG_EVIDENCE = [
@@ -46,10 +44,21 @@ def offline(monkeypatch):
         async def fake_record(**kwargs) -> int:
             return 1
 
+        # B 出口：缺参数时会调这两个，打桩保证不碰真实数据库
+        async def fake_skus(**kwargs):
+            from app.tools.orders import ToolResult
+
+            return ToolResult(False, "not_found")
+
+        async def fake_orders(*, user_id: str):
+            return []
+
         monkeypatch.setattr("app.graph.nodes.classify", fake_classify)
         monkeypatch.setattr("app.graph.knowledge.search", fake_search)
         monkeypatch.setattr("app.core.llm.chat", fake_chat)
         monkeypatch.setattr("app.graph.knowledge.record_low_conf", fake_record)
+        monkeypatch.setattr("app.graph.data_exit.list_stock_skus", fake_skus)
+        monkeypatch.setattr("app.graph.order_select.list_user_orders", fake_orders)
 
     return _set
 
@@ -94,9 +103,15 @@ async def test_unknown_intent_falls_back(offline):
     assert result["route"] == "fallback"
 
 
-@pytest.mark.parametrize("intent", sorted(INTENT_TO_ROUTE))
-async def test_no_exit_emits_amounts(offline, intent):
-    """占位与已实现出口都不得凭空给金额。
+@pytest.mark.parametrize(
+    "intent",
+    sorted(i for i, route in INTENT_TO_ROUTE.items() if route != "data"),
+)
+async def test_text_exits_do_not_emit_numbers(offline, intent):
+    """文字类出口不得凭空给金额。
+
+    **排除 data 出口**：数据查询的回答本来就该包含价格 / 库存 / 单号，
+    「有数字」不是问题；那里守的是"数字必须来自数据库"（Task 7 的模板测试）。
 
     知识出口这里用的是 mock 生成，所以这条只守"文案里没有数字"，
     真实的"金额是否来自证据"由 Ch06 的输出校验负责。

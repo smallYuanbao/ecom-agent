@@ -6,18 +6,19 @@
 |---|---|
 | `knowledge` | ✅ 真实子图（retrieve → gate → generate / weak_fallback） |
 | `rules` | ✅ 真实子图（9 状态退款流水线） |
-| `data` | 占位（明确告知"开发中"） |
+| `data` | ✅ 真实子图（5 状态数据查询） |
 | `human` / `fallback` | ✅ 真实话术 |
 
 **节点名与边一个都不改**——这就是"行走骨架"：形状先立住，函数体逐章替换。
+Ch04 之后五个出口全部是真实实现，占位机制已删除。
 """
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
+from app.graph.data_exit import build_data_graph
 from app.graph.knowledge import build_knowledge_graph
 from app.graph.nodes import (
     classify_intent,
-    data_exit,
     fallback_exit,
     human_exit,
     resolve_reference,
@@ -37,7 +38,7 @@ def build_graph() -> CompiledStateGraph:
     g.add_node("resolve_reference", resolve_reference)   # Ch05 换真实实现
     g.add_node("classify_intent", classify_intent)       # Task 2 换成真实分类
     g.add_node("knowledge", build_knowledge_graph())     # 编译后的子图可直接当节点
-    g.add_node("data", data_exit)                        # Ch04 换成真实查询
+    g.add_node("data", build_data_graph())               # Ch04：5 状态数据查询子图
     g.add_node("rules", build_rules_graph())             # Ch03：9 状态退款子图
     g.add_node("human", human_exit)                      # Task 8 换成真实话术
     g.add_node("fallback", fallback_exit)                # Task 8 换成三脚本

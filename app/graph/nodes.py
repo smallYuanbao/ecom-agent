@@ -75,29 +75,9 @@ async def classify_intent(state: ConversationState) -> dict:
     }
 
 
-# ── 占位出口（尚未实现的 B 出口）───────────────────────────
-# 话术要求：明确告知"开发中"，且**一个数字都不出现**——
-# 用户会把"约 3 个工作日""需 20 元"当成真实承诺。
-PLACEHOLDER_TEXT: dict[str, str] = {
-    "data": "订单与库存查询正在开发中，您可以先转人工处理。",
-}
-
-
-def _placeholder(route: str) -> dict:
-    """占位出口的返回体：明确告知 + 给转人工动作，不返回任何数字。"""
-    return {
-        "answer": PLACEHOLDER_TEXT[route],
-        "is_placeholder": True,
-        "actions": [{"type": "transfer_human"}],
-    }
-
-
 # ── 各出口 ────────────────────────────────────────────────
-# 每个出口一个函数，便于独立替换与独立测试。
-
-async def data_exit(state: ConversationState) -> dict:
-    """B 数据出口：Ch04 换成参数校验 → 工具 → 结果校验。"""
-    return _placeholder("data")
+# 每个出口一个函数（或子图），便于独立替换与独立测试。
+# Ch04 之后五个出口全部是真实实现，占位机制已删除。
 
 
 async def human_exit(state: ConversationState) -> dict:

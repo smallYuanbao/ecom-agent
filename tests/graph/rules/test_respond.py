@@ -173,7 +173,8 @@ def test_rules_node_is_compiled_subgraph():
     assert isinstance(node.data, CompiledStateGraph)
 
 
-def test_placeholder_rules_exit_is_removed():
-    """占位函数删掉，避免有人误以为它还在用。"""
+def test_placeholder_mechanism_is_removed():
+    """五个出口都接真实实现后，占位函数与文案机制都应删除。"""
     assert not hasattr(nodes, "rules_exit")
-    assert "rules" not in nodes.PLACEHOLDER_TEXT
+    assert not hasattr(nodes, "data_exit")
+    assert not hasattr(nodes, "PLACEHOLDER_TEXT")
