@@ -53,6 +53,8 @@
 | [../interview/ch01-data-foundation.md](../interview/ch01-data-foundation.md) | Ch01：双写 DDL、幂等、越权、seed 覆盖度 |
 | [../interview/ch02-retrieval-skeleton.md](../interview/ch02-retrieval-skeleton.md) | Ch02：查表路由、检索选型、证据闸、RAG 评测 |
 | [../interview/ch03-refund.md](../interview/ch03-refund.md) | Ch03：模型判定 + 代码复算、评测设计、踩坑故事 |
+| [../interview/database-qa.md](../interview/database-qa.md) | 数据库问答：索引 / 事务 / WAL / async ORM |
+| [../interview/self-test.md](../interview/self-test.md) | 自测方法：抽题表、评分标准、模拟面试与演示脚本 |
 
 ## 新增报告时的检查清单
 

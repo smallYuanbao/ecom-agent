@@ -8,12 +8,15 @@
 | Ch01 | 数据地基：双写 DDL、幂等、越权 | [ch01-data-foundation.md](./ch01-data-foundation.md) |
 | Ch02 | 主流程骨架 + RAG 检索与评测 | [ch02-retrieval-skeleton.md](./ch02-retrieval-skeleton.md) |
 | Ch03 | 退款流水线：模型判定 + 代码复算 | [ch03-refund.md](./ch03-refund.md) |
+| 数据库 | 索引 / 事务 / WAL / async ORM 的详细问答 | [database-qa.md](./database-qa.md) |
+| 自测 | 抽题表、评分标准、模拟面试与演示脚本 | [self-test.md](./self-test.md) |
 
 ## 怎么用
 
 1. **面试前 10 分钟**：只看每份的「0. 30 秒版本」和「数字速查」；
 2. **简历写完**：对着「追问清单」逐条自问，答不上来的回代码里补；
-3. **被问住了**：先承认边界（样本量、未做的部分），再讲下一步计划——比硬答得分高。
+3. **正式准备**：按 [self-test.md](./self-test.md) 的三天计划做闭卷自测；
+4. **被问住了**：先承认边界（样本量、未做的部分），再讲下一步计划——比硬答得分高。
 
 ## 跨章的主线
 
