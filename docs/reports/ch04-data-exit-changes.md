@@ -7,6 +7,7 @@
 | # | 日期 | 任务 | commit |
 |---|---|---|---|
 | 1 | 2026-11-03 | Task 1 · 共享代码抽取 | `6563952` |
+| 2 | 2026-11-03 | Task 2 · 工具层（只读查询） | `bf512c6` |
 
 ---
 
@@ -48,3 +49,39 @@ span 名仍是 `rules:intake`，没有变化。
 - `uv run pytest -q` → 618 passed, 42 skipped
 - `uv run ruff check app tests` → All checks passed
 - C 出口测试一条未改（只改了 import 与 patch 位置），全绿说明搬移没改行为
+
+---
+
+## 2 · Task 2 · 工具层（`bf512c6`）
+
+### 新增
+
+| 文件 | 内容 |
+|---|---|
+| `app/tools/orders.py` | `ToolResult` + `query_order` / `query_logistics` / `query_stock` / `list_stock_skus` |
+| `tests/tools/test_orders.py` | 19 条：三个查询的 happy path / 越权 / 缺参 / 坏数据 / 内部异常 |
+
+### 修改与原因
+
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+|---|---|---|---|
+| `repo_order.py` · 库存查询 | 只有 `get_stock(sku_id, spec)`，必须同时给规格 | 加 `list_stock_by_sku` 与 `list_stock` | 用户只报型号时要先列全部规格；缺型号时要列全部 SKU |
+| `rules_exit` / `data_exit` 的错误处理 | 各自 try/except | 工具层统一 `ToolResult` | 图里只做分支；错误码只有四个，可枚举、可测试 |
+| spec / plan 的工具清单 | 列了 `list_orders` | 删掉，注明复用 `order_select.ask_order` | 两处实现同一套候选形状，迟早话术不一致 |
+
+### 三个设计点
+
+**1. 越权与不存在共用 `not_found`。** 仓库层对两者都抛同一个 `NotFound`（S1）；
+工具层不再细分，上层只有一句「没有找到这笔订单」。
+
+**2. 坏 JSON 降级，不抛异常。** 物流 `nodes` 是 JSON 文本，
+解析失败返回 `[]`，只显示 `latest_status`——数据问题不该让整轮失败。
+
+**3. `session` 可注入。** 沿用 `session_scope` 的约定：生产不传，测试传临时库。
+否则测试只能打桩 repo，测不到真实的 SQL 路径。
+
+### 验证
+
+- `uv run pytest tests/tools -q` → 19 passed
+- `uv run pytest -q` → 637 passed, 42 skipped
+- `uv run ruff check app tests` → All checks passed
