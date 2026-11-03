@@ -9,6 +9,7 @@
 | 1 | 2026-11-03 | Task 1 · 共享代码抽取 | `6563952` |
 | 2 | 2026-11-03 | Task 2 · 工具层（只读查询） | `bf512c6` |
 | 3 | 2026-11-03 | Task 3 · 5 状态子图骨架 | `3998ed6` |
+| 4 | 2026-11-03 | Task 4 · 抽参数与按意图校验 | `c43e1d2` |
 
 ---
 
@@ -119,4 +120,36 @@ span 名仍是 `rules:intake`，没有变化。
 
 - `uv run pytest tests/graph/data -q` → 17 passed
 - `uv run pytest -q` → 654 passed, 42 skipped
+- `uv run ruff check app tests` → All checks passed
+
+---
+
+## 4 · Task 4 · 抽参数与按意图校验（`c43e1d2`）
+
+### 新增
+
+| 文件 | 内容 |
+|---|---|
+| `tests/graph/data/test_extract_params.py` | 16 条：抽取 / 校验 / 图上的追问效果 |
+
+### 修改与原因
+
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+|---|---|---|---|
+| `data_exit.py` · `extract_params` | `_stub` 返回空 | 正则抽 `order_id` / `sku_id`（复用 `graph/params.py`） | 没有参数，后面的查询没有输入 |
+| `data_exit.py` · `validate` | `_stub` 返回空 | 按意图写 `pending_question`；齐全时写 `None` | 守卫与 `need_info` 需要一个**单一来源**判断"缺什么" |
+| `data_exit.py` · `build_data_graph` | 5 个节点全是 `_stub` | `real_nodes` 映射，逐个替换 | 与 C 出口相同的渐进替换方式 |
+
+### 两个细节
+
+**1. 两个节点都不查库。** 存在性、归属、规格匹配都在 `query` 的工具层——
+那里才能同时覆盖"不存在"与"越权"，且错误码统一。
+
+**2. 参数齐全时显式写 `None`。** 如果 state 里残留上一轮的 `pending_question`，
+不写 `None` 会被守卫误判成"还在追问"。`None` 是"已清空"，不是"没写过"。
+
+### 验证
+
+- `uv run pytest tests/graph/data -q` → 33 passed
+- `uv run pytest -q` → 670 passed, 42 skipped
 - `uv run ruff check app tests` → All checks passed
