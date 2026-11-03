@@ -16,9 +16,11 @@ from typing import Any
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
+from app.graph.order_select import ask_order
 from app.graph.params import extract_order_id, extract_sku
 from app.graph.state import ConversationState
 from app.graph.tracing import traced
+from app.tools.orders import list_stock_skus, query_stock
 
 # 5 个节点的名字（与本文件的函数名一致）
 NODE_NAMES: tuple[str, ...] = (
@@ -79,6 +81,75 @@ async def validate(state: ConversationState) -> dict:
     return {"pending_question": None}
 
 
+# ── need_info · 补充信息 ────────────────────────────────────
+
+
+async def need_info(state: ConversationState) -> dict:
+    """缺什么问什么。
+
+    **本轮只负责把问题问出去**，用户回答后是下一次图执行，
+    从 `extract_params` 重新走。跨轮恢复靠 DB 的 `pending_question`。
+    """
+    pending = state.get("pending_question")
+    if pending == "order_id":
+        return await ask_order(state)
+    if pending == "sku_id":
+        return await _ask_sku()
+    if pending == "spec":
+        return await _ask_spec(state)
+    return {}
+
+
+async def _ask_sku() -> dict:
+    """要型号。库里有几个就列几个；查不到就退化成文字追问。"""
+    result = await list_stock_skus()
+    if not result.ok or not result.data:
+        return {
+            "pending_question": "sku_id",
+            "answer": "请提供商品型号（例如 ST-20），我帮您查库存。",
+            "is_placeholder": False,
+        }
+
+    candidates = [{"sku_id": sku} for sku in result.data["skus"]]
+    return {
+        "sku_candidates": candidates,
+        "pending_question": "sku_id",
+        "answer": "请选择商品型号，我帮您查库存。",
+        "actions": [{"type": "select_sku", "candidates": candidates}],
+        "is_placeholder": False,
+    }
+
+
+async def _ask_spec(state: ConversationState) -> dict:
+    """要规格。只列该型号的规格；查不到就退化成文字追问。"""
+    sku_id = state.get("sku_id") or ""
+    result = await query_stock(sku_id)
+    if not result.ok or not result.data:
+        return {
+            "pending_question": "spec",
+            "answer": "请提供一下规格（例如颜色或容量）。",
+            "is_placeholder": False,
+        }
+
+    candidates = [
+        {
+            "sku_id": row["sku_id"],
+            "spec": row["spec"],
+            "price": row["price"],
+            "stock": row["stock"],
+            "status": row["status"],
+        }
+        for row in result.data.get("rows", [])
+    ]
+    return {
+        "spec_candidates": candidates,
+        "pending_question": "spec",
+        "answer": f"{sku_id} 有这几个规格，您要哪一个？",
+        "actions": [{"type": "select_spec", "candidates": candidates}],
+        "is_placeholder": False,
+    }
+
+
 # ── 守卫：只返回键，不写 state ──────────────────────────────
 
 
@@ -109,7 +180,11 @@ def build_data_graph() -> CompiledStateGraph:
     """编译 B 出口子图。主图把它挂在 `data` 节点上。"""
     graph: Any = StateGraph(ConversationState)
 
-    real_nodes = {"extract_params": extract_params, "validate": validate}
+    real_nodes = {
+        "extract_params": extract_params,
+        "validate": validate,
+        "need_info": need_info,
+    }
     for name in NODE_NAMES:
         graph.add_node(name, traced("data", name, real_nodes.get(name, _stub)))
 
