@@ -8,6 +8,7 @@
 |---|---|---|---|
 | 1 | 2026-11-03 | Task 1 · 共享代码抽取 | `6563952` |
 | 2 | 2026-11-03 | Task 2 · 工具层（只读查询） | `bf512c6` |
+| 3 | 2026-11-03 | Task 3 · 5 状态子图骨架 | `3998ed6` |
 
 ---
 
@@ -84,4 +85,38 @@ span 名仍是 `rules:intake`，没有变化。
 
 - `uv run pytest tests/tools -q` → 19 passed
 - `uv run pytest -q` → 637 passed, 42 skipped
+- `uv run ruff check app tests` → All checks passed
+
+---
+
+## 3 · Task 3 · 5 状态子图骨架（`3998ed6`）
+
+### 新增
+
+| 文件 | 内容 |
+|---|---|
+| `app/graph/data_exit.py` | 5 个空节点、3 个守卫、3 张条件边映射、`build_data_graph()` |
+| `tests/graph/data/test_graph.py` | 17 条：节点数 / 边表 / 守卫键 / 可达性 / 空走终止 / span |
+
+### 修改与原因
+
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+|---|---|---|---|
+| `state.py` · `ConversationState` | 没有 B 出口字段 | 加 `sku_id` / `sku_candidates` / `spec_candidates` / `data_result` / `tool_code` | 子图与主图共用 schema；不声明字段，节点写入会被 LangGraph 拒绝 |
+
+### 三个设计点
+
+**1. 5 状态 / 8 转移 / 3 个守卫。** 比 C 出口简单得多——没有判定、没有算钱、没有合规，
+只有"抽参数 → 校验 → 查询 → 组装"。
+
+**2. `query` 的默认分支是转人工（fail-closed）。** 没有 `tool_code`、或者码不在
+`ok/not_found/invalid_arg` 里，一律走 human。骨架阶段空状态就是这样终止的。
+
+**3. span 前缀是 `data:`。** 复用 Task 1 的 `traced(prefix, name, node)`，
+和 C 出口的 `rules:` 区分开。
+
+### 验证
+
+- `uv run pytest tests/graph/data -q` → 17 passed
+- `uv run pytest -q` → 654 passed, 42 skipped
 - `uv run ruff check app tests` → All checks passed
