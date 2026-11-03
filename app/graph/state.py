@@ -35,6 +35,13 @@ class ConversationState(TypedDict, total=False):
     pending_question: str | None     # need_info 的追问话术；非空 = 在等用户回答
     transfer_reason: str             # 转人工的原因（trace 与落池用）
 
+    # ── B 出口：数据查询（Ch04）────────────────────────────────
+    sku_id: str                      # extract_params 抽出的商品型号
+    sku_candidates: list[dict]       # 缺型号时列给用户选
+    spec_candidates: list[dict]      # 缺规格时列该型号的可选规格
+    data_result: dict                # 工具返回的结构化数据，供 format 使用
+    tool_code: str                   # 工具结果码：ok / not_found / invalid_arg / timeout / internal
+
     # ── 输出：给用户看 ──────────────────────────────────────────
     answer: str                   # 回复正文；占位节点也必须写，不能留空
     actions: list[dict]           # 前端动作，目前只有 {"type": "transfer_human"}
