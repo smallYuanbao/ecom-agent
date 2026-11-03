@@ -21,6 +21,7 @@ PATH_PREFIXES = ("app/", "scripts/", "data/", "tests/", "docs/", "client/")
 
 _ROW_RE = re.compile(r"^\| (P\d-\d+) \|")
 _BACKTICK_RE = re.compile(r"`([^`]+)`")
+_LINK_RE = re.compile(r"\]\(([^)]+)\)")
 
 
 def _table_rows(text: str) -> list[dict]:
@@ -111,3 +112,30 @@ def test_status_values_are_known():
     for row in _table_rows(TASKS.read_text(encoding="utf-8")):
         head = row["status"].split()[0] if row["status"] else ""
         assert head in allowed, f"{row['id']} 的状态非法：{row['status']!r}"
+
+
+def test_internal_markdown_links_resolve():
+    """文档里的相对链接必须指向真实文件。
+
+    只检查**落在仓库内**的链接；指向仓库外（如 `ai-learning-notes`）的链接
+    跳过——那些文件不随仓库分发，CI 里不一定存在。
+    """
+    root = Path(__file__).resolve().parents[2]
+    broken: list[str] = []
+
+    for md in [root / "README.md", *sorted((root / "docs").rglob("*.md"))]:
+        if not md.exists():
+            continue
+        for target in _LINK_RE.findall(md.read_text(encoding="utf-8")):
+            if target.startswith(("http://", "https://", "#", "mailto:")):
+                continue
+            path = target.split("#")[0]
+            if not path:
+                continue
+            resolved = (md.parent / path).resolve()
+            if not resolved.is_relative_to(root):
+                continue
+            if not resolved.exists():
+                broken.append(f"{md.relative_to(root)} -> {target}")
+
+    assert not broken, "坏链：\n" + "\n".join(broken)
