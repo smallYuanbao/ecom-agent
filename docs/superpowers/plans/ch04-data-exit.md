@@ -64,11 +64,12 @@ async def ask_order(state, *, session=None) -> dict
 **Step 4: `app/graph/tracing.py`**
 
 ```python
-def traced(prefix: str, node):     # 原 rules_exit._traced
-    """给子图节点套 span，名字为 f"{prefix}:{name}"。"""
+def traced(prefix: str, name: str, node):     # 原 rules_exit._traced
+    """给子图节点套 span，名字为 f"{prefix}:{name}"，如 `rules:judge`。"""
 ```
 
-`rules_exit` 改成 `traced("rules", ...)`，span 名不变。
+`rules_exit` 改成 `traced("rules", name, ...)`，span 名不变。
+`name` 是节点键名（如 `intake`），必须与图的节点名一致，否则 trace 里对不上边表。
 
 **Step 5: 改 `rules_exit` 的引用**
 

@@ -55,6 +55,7 @@ from typing import Any
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
+from app.core.format import yuan_text
 from app.core.llm import LLMFormatError, structured_call
 from app.core.llm import chat as llm_chat
 from app.core.prompts import (
@@ -72,8 +73,11 @@ from app.core.retrieval import search
 from app.core.tracer import record_span
 from app.db.errors import NotFound
 from app.db.models import Order, utcnow
-from app.db.repo_order import get_order, list_user_orders
+from app.db.repo_order import get_order
+from app.graph.order_select import ask_order
+from app.graph.params import extract_order_id
 from app.graph.state import ConversationState
+from app.graph.tracing import traced
 from app.rules.eligibility import (
     NOT_APPLICABLE_KEYWORDS,
     SEVENTH_ARTICLE_KEYWORDS,
@@ -103,13 +107,6 @@ TRANSFER_ACTION = {"type": "transfer_human"}
 # 判定输出里，哪些理由码对应"可退"。`eligible` 与它必须一致——
 # `eligible=False` + `ok` 这种自相矛盾的输出要整条作废
 ELIGIBLE_REASONS = frozenset({"ok", "reject_then_refund"})
-
-# 订单号：4 位以上连续数字，且左右不能再接数字。
-# `(?<!\d)` / `(?!\d)` 防的是从 `123456` 里抠出前 4 位。
-ORDER_ID_RE = re.compile(r"(?<!\d)(\d{4,})(?!\d)")
-
-# 列给用户的候选订单数：超过 3 个选择困难，也占满屏幕
-CANDIDATE_LIMIT = 3
 
 # 政策检索取几条。5 条足够覆盖退款时效 / 不适用商品 / 完好要求三类条款
 POLICY_TOP_K = 5
@@ -153,19 +150,6 @@ async def _stub(state: ConversationState) -> dict:
 
 
 # ── intake · 受理 ───────────────────────────────────────────
-
-
-def extract_order_id(text: str) -> str | None:
-    """从用户原话里抠订单号；抠不到返回 `None`。
-
-    注意：**这里不判断"这个订单号存不存在"**——那是 `validate` 与
-    `query_data` 的事。正则只负责把纯数字挑出来，业务校验不混进来。
-
-    已知局限：手机号这类长数字也会被当成订单号。它会在 `query_data`
-    查不到订单，退回 `need_info` 列候选——**错得可控**，所以不为它加特判。
-    """
-    match = ORDER_ID_RE.search(text or "")
-    return match.group(1) if match else None
 
 
 async def intake(state: ConversationState) -> dict:
@@ -605,24 +589,6 @@ async def compliance(state: ConversationState) -> dict:
 # ── need_info · 补充信息 ────────────────────────────────────
 
 
-def yuan_text(cents: int) -> str:
-    """分 → 「1249.00 元」。用整数运算，避免浮点在边界上差 1 分。"""
-    return f"{cents // 100}.{cents % 100:02d} 元"
-
-
-def _candidate(order: Order) -> dict:
-    """候选订单的展示形状（给前端画卡片，不暴露内部字段）。"""
-    title = " ".join(part for part in (order.sku_id, order.spec) if part)
-    return {
-        "order_id": order.id,
-        "title": title,
-        "status": order.status,
-        "amount": order.amount,                   # 分
-        "amount_text": yuan_text(order.amount),   # 展示用
-        "created_at": order.created_at.strftime("%Y-%m-%d"),
-    }
-
-
 async def need_info(state: ConversationState) -> dict:
     """缺什么问什么。
 
@@ -641,34 +607,10 @@ async def need_info(state: ConversationState) -> dict:
     retry = (state.get("validate_retry") or 0) + 1
 
     if not state.get("order_id") or errors & {"missing_order_id", "order_not_found"}:
-        return {**await _ask_order(state), "validate_retry": retry}
+        return {**await ask_order(state), "validate_retry": retry}
     if not draft.get("reason_code") or "missing_reason_code" in errors:
         return {**_ask_reason(), "validate_retry": retry}
     return {}
-
-
-async def _ask_order(state: ConversationState) -> dict:
-    """要订单号。有 `user_id` 就列最近 3 单；没有就退化成文字追问。"""
-    user_id = state.get("user_id")
-    candidates: list[dict] = []
-    if user_id:
-        orders = await list_user_orders(user_id=user_id)
-        candidates = [_candidate(order) for order in orders[:CANDIDATE_LIMIT]]
-
-    if not candidates:
-        return {
-            "pending_question": "order_id",
-            "answer": "请提供一下订单号（在「我的订单」里可以看到）。",
-            "is_placeholder": False,
-        }
-
-    return {
-        "order_candidates": candidates,
-        "pending_question": "order_id",
-        "answer": "我查到您最近有这几笔订单，请问是哪一单？",
-        "actions": [{"type": "select_order", "candidates": candidates}],
-        "is_placeholder": False,
-    }
 
 
 def _ask_reason() -> dict:
@@ -793,32 +735,6 @@ async def respond(state: ConversationState) -> dict:
 # ── 子图 ────────────────────────────────────────────────────
 
 
-def _traced(name: str, node):
-    """给子图节点套一层 `trace_span`。
-
-    父图 `run_turn` 只会在子图整体结束时看到一行 `node:rules`——
-    里面跑了哪 9 个状态、各花多久，看不到。spec 验收要求"每个状态落一行"，
-    所以这里逐个记录。写失败不影响流程（`record_span` 自己兜底）。
-    """
-
-    async def wrapper(state: ConversationState) -> dict:
-        start = utcnow()
-        result = await node(state)
-        trace_id = state.get("trace_id")
-        if trace_id:
-            await record_span(
-                trace_id=trace_id,
-                name=f"rules:{name}",
-                start_at=start,
-                end_at=utcnow(),
-                attrs={"keys": sorted((result or {}).keys())},
-            )
-        return result
-
-    wrapper.__name__ = f"traced_{name}"
-    return wrapper
-
-
 def build_rules_graph() -> CompiledStateGraph:
     """编译退款子图。主图把它挂在 `rules` 节点上（节点名不变）。"""
     graph: Any = StateGraph(ConversationState)
@@ -835,7 +751,7 @@ def build_rules_graph() -> CompiledStateGraph:
         "need_info": need_info,
     }
     for name in NODE_NAMES:
-        graph.add_node(name, _traced(name, real_nodes.get(name, _stub)))
+        graph.add_node(name, traced("rules", name, real_nodes.get(name, _stub)))
 
     graph.set_entry_point("intake")
 

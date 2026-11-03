@@ -16,8 +16,9 @@ from datetime import datetime
 import pytest
 
 from app.db.models import Order
-from app.graph import rules_exit
-from app.graph.rules_exit import extract_order_id, intake, need_info
+from app.graph import order_select, rules_exit
+from app.graph.params import extract_order_id
+from app.graph.rules_exit import intake, need_info
 
 CREATED = datetime(2026, 10, 29, 10, 0)
 
@@ -49,7 +50,7 @@ def orders(monkeypatch):
         assert user_id == "u1"
         return rows
 
-    monkeypatch.setattr(rules_exit, "list_user_orders", _list)
+    monkeypatch.setattr(order_select, "list_user_orders", _list)
     return rows
 
 
@@ -144,7 +145,7 @@ async def test_user_without_orders_gets_text_question(monkeypatch):
     async def _empty(*, user_id: str):
         return []
 
-    monkeypatch.setattr(rules_exit, "list_user_orders", _empty)
+    monkeypatch.setattr(order_select, "list_user_orders", _empty)
     result = await need_info({"user_id": "u9", "raw_query": "我要退款"})
 
     assert result["pending_question"] == "order_id"

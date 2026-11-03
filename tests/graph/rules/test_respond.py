@@ -12,8 +12,10 @@ respond 的职责边界：**模型只决定怎么说，不决定说什么**。
 import pytest
 from langgraph.graph.state import CompiledStateGraph
 
-from app.graph import build, nodes, rules_exit
-from app.graph.rules_exit import _ensure_amount, _traced, respond, yuan_text
+from app.core.format import yuan_text
+from app.graph import build, nodes, rules_exit, tracing
+from app.graph.rules_exit import _ensure_amount, respond
+from app.graph.tracing import traced
 
 # ── 金额格式化 ──────────────────────────────────────────────
 
@@ -145,7 +147,7 @@ async def test_each_subgraph_node_writes_a_span(monkeypatch):
     async def _span(**kwargs):
         spans.append(kwargs)
 
-    monkeypatch.setattr(rules_exit, "record_span", _span)
+    monkeypatch.setattr(tracing, "record_span", _span)
 
     await rules_exit.build_rules_graph().ainvoke({"raw_query": "我要退款", "trace_id": "t1"})
 
@@ -159,8 +161,8 @@ def test_traced_wrapper_keeps_return_value():
     async def node(state):
         return {"x": 1}
 
-    wrapped = _traced("demo", node)
-    assert wrapped.__name__ == "traced_demo"
+    wrapped = traced("demo", "node", node)
+    assert wrapped.__name__ == "traced_demo_node"
 
 
 # ── 主图接线 ────────────────────────────────────────────────

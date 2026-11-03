@@ -14,7 +14,7 @@ import pytest
 
 from app.db.errors import NotFound
 from app.db.models import Order
-from app.graph import rules_exit
+from app.graph import order_select, rules_exit
 from app.graph.rules_exit import after_validate, need_info, order_snapshot, validate
 
 CREATED = datetime(2026, 10, 29, 10, 0)
@@ -172,7 +172,7 @@ async def test_need_info_re_asks_order_when_not_found(monkeypatch):
     async def _list(*, user_id: str):
         return [make_order()]
 
-    monkeypatch.setattr(rules_exit, "list_user_orders", _list)
+    monkeypatch.setattr(order_select, "list_user_orders", _list)
     result = await need_info(
         {
             "user_id": "u1",
