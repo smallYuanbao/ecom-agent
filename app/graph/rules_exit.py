@@ -78,6 +78,7 @@ from app.graph.order_select import ask_order
 from app.graph.params import extract_order_id
 from app.graph.state import ConversationState
 from app.graph.tracing import traced
+from app.graph.transfer import transfer
 from app.rules.eligibility import (
     NOT_APPLICABLE_KEYWORDS,
     SEVENTH_ARTICLE_KEYWORDS,
@@ -99,10 +100,6 @@ MAX_VALIDATE_RETRY = 2
 # 用户无法修正的数据矛盾：追问没有意义，直接转人工。
 # 目前只有「签收早于发货」——那是 ERP/时区/补录的问题，不是用户填错。
 NON_RETRYABLE_ERRORS = frozenset({"date_anomaly"})
-
-# 转人工的兜底话术：不解释内部原因，也不承诺任何数字
-TRANSFER_TEXT = "这个问题我这边处理不了，已经为您转接人工客服。"
-TRANSFER_ACTION = {"type": "transfer_human"}
 
 # 判定输出里，哪些理由码对应"可退"。`eligible` 与它必须一致——
 # `eligible=False` + `ok` 这种自相矛盾的输出要整条作废
@@ -264,16 +261,6 @@ def _date_anomaly(order: Order) -> bool:
     return order.signed_at < order.shipped_at
 
 
-def _transfer(reason: str) -> dict:
-    """转人工的返回体：话术 + 动作 + 原因（trace / 落池用）。"""
-    return {
-        "transfer_reason": reason,
-        "answer": TRANSFER_TEXT,
-        "actions": [dict(TRANSFER_ACTION)],
-        "is_placeholder": False,
-    }
-
-
 async def validate(state: ConversationState) -> dict:
     """校验要素：齐不齐、是不是本人的单、日期是否矛盾。
 
@@ -310,9 +297,9 @@ async def validate(state: ConversationState) -> dict:
 
     retry = state.get("validate_retry") or 0
     if set(errors) & NON_RETRYABLE_ERRORS:
-        updates.update(_transfer("date_anomaly"))
+        updates.update(transfer("date_anomaly"))
     elif errors and retry >= MAX_VALIDATE_RETRY:
-        updates.update(_transfer("validate_retry_exhausted"))
+        updates.update(transfer("validate_retry_exhausted"))
 
     return updates
 
@@ -356,7 +343,7 @@ async def query_data(state: ConversationState) -> dict:
 
     updates["evidence"] = hits
     if not hits:
-        updates.update(_transfer("policy_retrieval_empty"))
+        updates.update(transfer("policy_retrieval_empty"))
     return updates
 
 
@@ -419,15 +406,15 @@ async def judge(state: ConversationState) -> dict:
             ),
         )
     except LLMFormatError:
-        return _transfer("judge_format_error")
+        return transfer("judge_format_error")
 
     judgement = _clean_judgement(data)
     if judgement is None:
-        return _transfer("judge_format_error")
+        return transfer("judge_format_error")
 
     updates: dict = {"refund_judgement": judgement}
     if judgement["confidence"] < CONFIDENCE_MIN:
-        updates.update(_transfer("judge_low_confidence"))
+        updates.update(transfer("judge_low_confidence"))
     return updates
 
 
@@ -582,7 +569,7 @@ async def compliance(state: ConversationState) -> dict:
 
     await _record_violation(state, violation, judgement)
     updates: dict = {"compliance_violation": violation}
-    updates.update(_transfer(violation))
+    updates.update(transfer(violation))
     return updates
 
 

@@ -249,16 +249,20 @@ B 出口没有模型参与工具选择，所以不存在"模型伪造 user_id"�
 
 ---
 
-## 结果校验（在 `after_query` 守卫里）
+## 结果校验（在 `query` 内）
 
-`query` 只负责拿到数据；`after_query` 在放行前检查必需字段，
-缺字段按系统异常处理（转人工），不硬拼：
+`query` 拿到工具结果后、写 `tool_code=ok` 之前检查必需字段，
+缺字段按系统异常处理（置 `internal` + 写转人工载荷），不硬拼：
 
 | 意图 | 必需字段 |
 |---|---|
 | 订单 | `order_id`、`status`、`amount`、`created_at` |
-| 物流 | `tracking_no`、`latest_status` |
+| 物流 | `tracking_no`、`latest_status`（无物流单号时退回检查订单字段） |
 | 库存 | `sku_id`、`spec`、`stock`、`price`、`status` |
+
+**为什么校验放在 `query` 而不是守卫**：守卫只返回键，写不了转人工话术。
+放在 `query` 里，缺字段时能同时写 `tool_code=internal` 和 `transfer` 载荷，
+守卫只按码分流。
 
 **为什么不在 `format` 里兜底**：`format` 的职责是拼文案；如果它还要判断"数据能不能用"，
 模板测试就得覆盖两种失败路径。分开之后，`format` 的输入永远是完整的 `data_result`，
@@ -274,6 +278,7 @@ B 出口没有模型参与工具选择，所以不存在"模型伪造 user_id"�
 | `rules_exit._candidate` / `_ask_order` | `app/graph/order_select.py` | B / C |
 | `rules_exit.extract_order_id` | `app/graph/params.py` | B / C |
 | `rules_exit._traced` | `app/graph/tracing.py` | B / C（span 命名加前缀） |
+| `rules_exit._transfer` | `app/graph/transfer.py` | B / C（转人工载荷统一） |
 
 **为什么现在抽**：B 出口要复用同样的"列候选"和"金额格式"，复制会立刻产生两份话术。
 这是**纯搬移**，C 的行为不变，由现有测试兜住。

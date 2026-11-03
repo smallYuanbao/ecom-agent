@@ -20,7 +20,13 @@ from app.graph.order_select import ask_order
 from app.graph.params import extract_order_id, extract_sku
 from app.graph.state import ConversationState
 from app.graph.tracing import traced
-from app.tools.orders import list_stock_skus, query_stock
+from app.graph.transfer import transfer
+from app.tools.orders import (
+    list_stock_skus,
+    query_logistics,
+    query_order,
+    query_stock,
+)
 
 # 5 个节点的名字（与本文件的函数名一致）
 NODE_NAMES: tuple[str, ...] = (
@@ -79,6 +85,100 @@ async def validate(state: ConversationState) -> dict:
     if intent == "库存价格" and not state.get("sku_id"):
         return {"pending_question": "sku_id"}
     return {"pending_question": None}
+
+
+# ── query · 查数据 ─────────────────────────────────────────
+
+REQUIRED_ORDER = ("order_id", "status", "amount", "created_at")
+REQUIRED_STOCK = ("sku_id", "spec", "stock", "price", "status")
+
+
+def match_spec(query: str, rows: list[dict]) -> str | None:
+    """从用户原话里匹配规格。
+
+    - 多个命中取**最长**：「灰」不能匹配成「星光灰」
+    - 只有一个规格时，用户不说也能确定
+    - 多个规格且没命中 → 返回 `None`，让 `need_info` 去追问
+    """
+    hits = [row["spec"] for row in rows if row.get("spec") and row["spec"] in query]
+    if hits:
+        return max(hits, key=len)
+    if len(rows) == 1:
+        return rows[0]["spec"]
+    return None
+
+
+def _complete(data: dict, fields: tuple[str, ...]) -> bool:
+    return all(data.get(field) is not None for field in fields)
+
+
+def _complete_tracking(data: dict) -> bool:
+    tracking = data.get("tracking")
+    if tracking is None:
+        return _complete(data.get("order") or {}, REQUIRED_ORDER)
+    return bool(tracking.get("tracking_no")) and bool(tracking.get("latest_status"))
+
+
+def _on_failure(intent: str, code: str | None) -> dict:
+    """工具失败 → 追问或转人工。`not_found` / `invalid_arg` 都还能靠用户补。"""
+    if code in {"not_found", "invalid_arg"}:
+        pending = "sku_id" if intent == "库存价格" else "order_id"
+        return {"tool_code": code, "pending_question": pending}
+    return transfer(f"tool_{code or 'unknown'}")
+
+
+async def query(state: ConversationState) -> dict:
+    """按意图查数据，写 `tool_code` 与 `data_result`。
+
+    **结果校验也在这里**：字段不完整时直接置 `internal`（转人工），
+    保证进入 `format` 的数据永远是完整的。
+    """
+    intent = state.get("intent")
+    user_id = state.get("user_id") or ""
+    text = state.get("resolved_query") or state.get("raw_query") or ""
+
+    if intent == "订单查询":
+        result = await query_order(state.get("order_id") or "", user_id=user_id)
+        if not result.ok:
+            return _on_failure(intent, result.code)
+        if not _complete(result.data or {}, REQUIRED_ORDER):
+            return transfer("data_incomplete")
+        return {"tool_code": "ok", "data_result": result.data}
+
+    if intent == "物流查询":
+        order = await query_order(state.get("order_id") or "", user_id=user_id)
+        if not order.ok:
+            return _on_failure(intent, order.code)
+
+        data = {"order": order.data, "tracking": None}
+        tracking_no = (order.data or {}).get("tracking_no")
+        if tracking_no:
+            tracking = await query_logistics(tracking_no, user_id=user_id)
+            if not tracking.ok:
+                return _on_failure(intent, tracking.code)
+            data["tracking"] = tracking.data
+
+        if not _complete_tracking(data):
+            return transfer("data_incomplete")
+        return {"tool_code": "ok", "data_result": data}
+
+    if intent == "库存价格":
+        listed = await query_stock(state.get("sku_id") or "")
+        if not listed.ok:
+            return _on_failure(intent, listed.code)
+
+        rows = (listed.data or {}).get("rows", [])
+        spec = match_spec(text, rows)
+        if spec is None:
+            return {"tool_code": "not_found", "pending_question": "spec"}
+
+        row = next(r for r in rows if r["spec"] == spec)
+        if not _complete(row, REQUIRED_STOCK):
+            return transfer("data_incomplete")
+        return {"tool_code": "ok", "data_result": row}
+
+    # 理论到不了（路由只把三个数据意图送进来）；fail-closed
+    return transfer("unsupported_intent")
 
 
 # ── need_info · 补充信息 ────────────────────────────────────
@@ -183,6 +283,7 @@ def build_data_graph() -> CompiledStateGraph:
     real_nodes = {
         "extract_params": extract_params,
         "validate": validate,
+        "query": query,
         "need_info": need_info,
     }
     for name in NODE_NAMES:

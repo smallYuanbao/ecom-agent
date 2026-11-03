@@ -5,7 +5,9 @@
 """
 import pytest
 
+from app.graph import data_exit
 from app.graph.data_exit import build_data_graph, extract_params, validate
+from app.tools.orders import ToolResult
 
 # ── extract_params ─────────────────────────────────────────
 
@@ -59,15 +61,35 @@ async def test_graph_asks_for_order_id_when_missing():
     assert result["pending_question"] == "order_id"
 
 
-async def test_graph_asks_for_sku_when_missing():
+async def test_graph_asks_for_sku_when_missing(monkeypatch):
+    async def _skus(**kwargs):
+        return ToolResult(True, None, {"skus": ["ST-20"]})
+
+    monkeypatch.setattr(data_exit, "list_stock_skus", _skus)
+
     result = await build_data_graph().ainvoke(
         {"intent": "库存价格", "raw_query": "推车还有货吗"}
     )
     assert result["pending_question"] == "sku_id"
 
 
-async def test_graph_clears_pending_question_when_complete():
+async def test_graph_clears_pending_question_when_complete(monkeypatch):
+    async def _order(order_id, *, user_id, session=None):
+        return ToolResult(
+            True,
+            None,
+            {
+                "order_id": "1001",
+                "status": "已签收",
+                "amount": 129900,
+                "created_at": "2026-10-29T10:00:00",
+                "tracking_no": None,
+            },
+        )
+
+    monkeypatch.setattr(data_exit, "query_order", _order)
+
     result = await build_data_graph().ainvoke(
-        {"intent": "订单查询", "raw_query": "订单1001 到哪了"}
+        {"intent": "订单查询", "raw_query": "订单1001 到哪了", "user_id": "u1"}
     )
     assert result.get("pending_question") is None

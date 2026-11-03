@@ -321,7 +321,10 @@ def match_spec(query: str, rows: list[dict]) -> str | None:
 
 **Step 4: 结果校验**
 
-守卫 `after_query` 检查必需字段（见 spec），缺字段 → `human`，写 `transfer_reason="data_incomplete"`。
+在 `query` 内检查必需字段（见 spec）；缺字段 → 置 `tool_code="internal"` 并写
+`transfer("data_incomplete")`，守卫只按码分流。
+
+**为什么不放守卫里**：守卫只返回键，写不了转人工话术；放在 `query` 里能同时写码和载荷。
 
 **测试：**
 - 订单 happy path / 他人单 / 不存在
