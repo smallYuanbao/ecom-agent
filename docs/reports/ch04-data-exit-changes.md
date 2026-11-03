@@ -10,6 +10,7 @@
 | 2 | 2026-11-03 | Task 2 · 工具层（只读查询） | `bf512c6` |
 | 3 | 2026-11-03 | Task 3 · 5 状态子图骨架 | `3998ed6` |
 | 4 | 2026-11-03 | Task 4 · 抽参数与按意图校验 | `c43e1d2` |
+| 5 | 2026-11-03 | Task 5 · 缺参列候选 | `fa214d0` |
 
 ---
 
@@ -152,4 +153,39 @@ span 名仍是 `rules:intake`，没有变化。
 
 - `uv run pytest tests/graph/data -q` → 33 passed
 - `uv run pytest -q` → 670 passed, 42 skipped
+- `uv run ruff check app tests` → All checks passed
+
+---
+
+## 5 · Task 5 · 缺参列候选（`fa214d0`）
+
+### 新增
+
+| 文件 | 内容 |
+|---|---|
+| `tests/graph/data/test_need_info.py` | 7 条：三种候选、降级、图上的效果 |
+
+### 修改与原因
+
+| 文件 · 符号 | 旧逻辑 | 新逻辑 | 为什么旧的撑不住 |
+|---|---|---|---|
+| `data_exit.py` · `need_info` | `_stub` 返回空 | 按 `pending_question` 分三种追问 | 用户不知道要补什么，本轮只会得到一个空回答 |
+| `data_exit.py` · `_ask_sku` | 无 | `list_stock_skus` 列型号 + `select_sku` | 型号是封闭集合，列出来比让用户猜格式可靠 |
+| `data_exit.py` · `_ask_spec` | 无 | `query_stock(sku_id)` 列该型号规格 + `select_spec` | 规格因型号而异，只能查库后再列 |
+
+### 三个设计点
+
+**1. 三种追问对应三种 action。** `select_order` / `select_sku` / `select_spec`——
+前端按 `type` 渲染不同选择器，不用解析文案。
+
+**2. 查不到候选时退化成文字。** 库是空的、工具失败，都不应该让追问变成 500；
+给一句「请提供型号（例如 ST-20）」，用户仍能继续。
+
+**3. 订单候选复用 C 出口的 `ask_order`。** 同一套候选形状与话术，
+不另写一份。
+
+### 验证
+
+- `uv run pytest tests/graph/data -q` → 40 passed
+- `uv run pytest -q` → 677 passed, 42 skipped
 - `uv run ruff check app tests` → All checks passed
