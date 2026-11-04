@@ -8,6 +8,7 @@
 | Ch01 | 数据地基：双写 DDL、幂等、越权 | [ch01-data-foundation.md](./ch01-data-foundation.md) |
 | Ch02 | 主流程骨架 + RAG 检索与评测 | [ch02-retrieval-skeleton.md](./ch02-retrieval-skeleton.md) |
 | Ch03 | 退款流水线：模型判定 + 代码复算 | [ch03-refund.md](./ch03-refund.md) |
+| Ch04 | 数据查询：零模型调用、固定链、模板回答 | [ch04-data-exit.md](./ch04-data-exit.md) |
 | 数据库 | 索引 / 事务 / WAL / async ORM 的详细问答 | [database-qa.md](./database-qa.md) |
 | 自测 | 抽题表、评分标准、模拟面试与演示脚本 | [self-test.md](./self-test.md) |
 
@@ -22,8 +23,8 @@
 
 | 主线 | 出现在 | 一句话 |
 |---|---|---|
-| **确定性 vs 模型** | Ch02 路由、Ch03 判定 | 能查表的不让模型决定；模型只做理解和表达 |
-| **fail-closed** | Ch02 证据闸、Ch03 三处闸 | 拿不准就拒答 / 转人工，不硬给结论 |
+| **确定性 vs 模型** | Ch02 路由、Ch03 判定、Ch04 零模型 | 能查表的不让模型决定；模型只做理解和表达 |
+| **fail-closed** | Ch02 证据闸、Ch03 三处闸、Ch04 工具异常 | 拿不准就拒答 / 转人工，不硬给结论 |
 | **评测要能区分被测对象** | Ch02 三策略、Ch03 两组 gold set | 规则满分时要另造难题，否则测不出模型价值 |
 | **失败样本比总分有用** | 全章 | 每条未命中的归因（模型 / 规则 / 数据）决定下一步修什么 |
 

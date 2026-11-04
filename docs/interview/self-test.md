@@ -1,7 +1,7 @@
 # 面试自测方法
 
 > 用途：不靠"读一遍文档"，靠**闭卷输出 + 对照 + 代码定位**发现漏洞。
-> 配套：[ch01](./ch01-data-foundation.md) / [ch02](./ch02-retrieval-skeleton.md) / [ch03](./ch03-refund.md)
+> 配套：[ch01](./ch01-data-foundation.md) / [ch02](./ch02-retrieval-skeleton.md) / [ch03](./ch03-refund.md) / [ch04](./ch04-data-exit.md)
 
 ---
 
@@ -69,7 +69,7 @@
 | 时间 | 问题 | 考察 |
 |---|---|---|
 | 0–1 min | 「介绍一下这个项目」 | 30 秒版本 |
-| 1–4 min | 「为什么退款用 Workflow 不用 Agent？」 | 架构取舍 |
+| 1–4 min | 「为什么退款用 Workflow 不用 Agent？数据查询为什么连模型都不用？」 | 架构取舍 |
 | 4–7 min | 「模型判错了怎么办？」 | 安全设计 |
 | 7–10 min | 「你怎么知道模型判得准？」 | 评测 |
 | 10–12 min | 「困难组才 10 条，够吗？」 | 边界意识 |
@@ -101,7 +101,19 @@ curl -N -X POST localhost:8000/api/chat \
   -d '{"message":"订单1002 不想要了"}'
 # 看点：route=rules；金额 1249.00 元；action=transfer 视情况
 
-# 3. 转人工：能说清是哪一类
+# 3. 数据查询：零模型、模板回答
+curl -N -X POST localhost:8000/api/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"订单1001 到哪了"}'
+# 看点：route=data；金额/单号逐字来自库；没有模型生成痕迹
+
+# 4. 缺单号：列候选，不是文字追问
+curl -N -X POST localhost:8000/api/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"我要查订单"}'
+# 看点：actions.type=select_order；3 个候选；本轮结束
+
+# 5. 转人工：能说清是哪一类
 curl -N -X POST localhost:8000/api/chat \
   -H 'Content-Type: application/json' \
   -d '{"message":"用了一下，不太确定算不算用过，能退吗"}'
@@ -131,7 +143,7 @@ curl -N -X POST localhost:8000/api/chat \
 | 天 | 内容 | 产出 |
 |---|---|---|
 | Day 1 | Ch01 + Ch02 闭卷复述；各抽 5 题 | 记录表 10 行 |
-| Day 2 | Ch03 闭卷 + 抽 10 题；练 4 条跨章主线 | 记录表 10 行 |
+| Day 2 | Ch03 + Ch04 闭卷 + 各抽 5 题；练 4 条跨章主线 | 记录表 10 行 |
 | Day 3 | 15 分钟模拟面试 + 5 分钟演示；复盘 ≤1 分的题 | 一份"还不会"的清单 |
 
 > 第三天结束还答不上的题，才是真正要回代码里补的。

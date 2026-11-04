@@ -40,7 +40,7 @@ app/
     repo_message.py      # 消息读写（status、client_message_id）
     repo_order.py        # 订单/物流/库存/券（user_id 必填）
 scripts/
-  init_db.py             # 建表（执行 schema.sql 或 create_all）
+  init_db.py             # 建表：ORM `create_all`；schema.sql 只用于一致性校验
   seed.py                # 6 SKU / 20 订单 / 5 券
 tests/
   test_models.py
