@@ -3,7 +3,7 @@
 设计依据：
   · L1：暴露 /api/chat（流式）与 /api/meta（评测快照用）
   · L7：每次请求一个 trace_id，贯穿日志
-  · C6：chat 接收 client_message_id 用于幂等（后续实现）
+  · C6：chat 接收 client_message_id 用于幂等（Ch05 Task 1 已接）
 """
 import json
 import logging
@@ -46,10 +46,13 @@ async def trace_middleware(request: Request, call_next):
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = ""
     conversation_id: int | None = None
     client_message_id: str | None = Field(
         default=None, description="幂等键，同一会话内唯一（K4）")
+    selected_action: dict | None = Field(
+        default=None,
+        description="结构化点选，如 {type: select_order, order_id: 1001}；与 message 至少给一个")
 
 
 def _sse(payload: dict) -> str:
@@ -86,7 +89,13 @@ async def chat(req: ChatRequest) -> StreamingResponse:
 
     async def event_stream():
         try:
-            async for frame in run_turn(req.message, req.conversation_id, trace_id):
+            async for frame in run_turn(
+                req.message,
+                req.conversation_id,
+                trace_id,
+                client_message_id=req.client_message_id,
+                selected_action=req.selected_action,
+            ):
                 yield _sse(frame)
         except ChatError as exc:
             # 校验类错误：可以告诉用户具体原因

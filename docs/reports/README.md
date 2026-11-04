@@ -12,6 +12,7 @@
 | [ch02-walking-skeleton-changes.md](./ch02-walking-skeleton-changes.md) | 主流程骨架：意图、路由、检索、知识出口 |
 | [ch03-rules-exit-changes.md](./ch03-rules-exit-changes.md) | C 出口：退款 9 状态流水线、判定、评测 |
 | [ch04-data-exit-changes.md](./ch04-data-exit-changes.md) | B 出口：订单 / 物流 / 库存查询 |
+| [ch05-multi-turn-changes.md](./ch05-multi-turn-changes.md) | 多轮：消息落库、锚点、窗口、指代、park、ReAct |
 
 ## 二、验收报告（一章做完时写）
 
@@ -55,6 +56,7 @@
 | [../interview/ch01-data-foundation.md](../interview/ch01-data-foundation.md) | Ch01：双写 DDL、幂等、越权、seed 覆盖度 |
 | [../interview/ch02-retrieval-skeleton.md](../interview/ch02-retrieval-skeleton.md) | Ch02：查表路由、检索选型、证据闸、RAG 评测 |
 | [../interview/ch03-refund.md](../interview/ch03-refund.md) | Ch03：模型判定 + 代码复算、评测设计、踩坑故事 |
+| [../interview/ch04-data-exit.md](../interview/ch04-data-exit.md) | Ch04：零模型调用、固定链、越权防枚举、模板回答 |
 | [../interview/database-qa.md](../interview/database-qa.md) | 数据库问答：索引 / 事务 / WAL / async ORM |
 | [../interview/self-test.md](../interview/self-test.md) | 自测方法：抽题表、评分标准、模拟面试与演示脚本 |
 

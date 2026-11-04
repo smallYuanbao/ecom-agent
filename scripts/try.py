@@ -7,6 +7,7 @@
 
     uv run python scripts/try.py intent "我买的推车能退吗"
     uv run python scripts/try.py graph  "我买的推车能退吗"
+    uv run python scripts/try.py chat   "我要退款"   # 多轮，保留 conversation_id
 
     uv run python scripts/try.py intent          # 不带文本 → 交互模式，逐行输入
 
@@ -98,9 +99,57 @@ async def run_retrieve(text: str, strategy: str | None = None) -> None:
         )
 
 
+async def run_chat(first: str | None = None) -> None:
+    """多轮对话：第一轮建会话，后续复用同一个 `conversation_id`。
+
+    验证的是 Task 1 的两件事：消息落库、`ack`/`done` 带回 id。
+    需要先跑过 `scripts/init_db.py` 与 `scripts/seed.py`。
+    """
+    from app.api.chat import run_turn
+    from app.core.logging import new_trace_id
+
+    cid: int | None = None
+    pending = first
+    while True:
+        if pending is None:
+            try:
+                text = input("你> ").strip()
+            except EOFError:
+                break
+            if not text:
+                break
+        else:
+            text, pending = pending, None
+
+        trace_id = new_trace_id()
+        print(f"  你: {text!r}")
+        try:
+            async for frame in run_turn(text, cid, trace_id):
+                event = frame.get("event")
+                if event == "ack":
+                    cid = frame.get("conversation_id")
+                    print(
+                        f"  conversation_id={cid} "
+                        f"user_message_id={frame.get('user_message_id')}"
+                    )
+                elif event == "route":
+                    print(f"  route={frame.get('route')} intent={frame.get('intent')}")
+                elif event == "delta":
+                    print(f"  答: {frame.get('delta')}")
+                elif event == "citations":
+                    print(f"  citations={frame.get('items')}")
+                elif event == "actions":
+                    print(f"  actions={frame.get('items')}")
+                elif event == "done":
+                    print(f"  message_id={frame.get('message_id')}")
+        except Exception as exc:  # noqa: BLE001 —— 手工工具：直接看到失败原因
+            print(f"  error: {exc}")
+
+
 MODES = {
     "intent": run_intent,
     "graph": run_graph,
+    "chat": run_chat,
     "retrieve": run_retrieve,
 }
 
@@ -114,6 +163,12 @@ async def main() -> int:
         help="仅 retrieve 模式：指定检索策略（默认取配置）",
     )
     args = parser.parse_args()
+
+    # chat 自己维护多轮循环，不走「一行一次」的通用分发
+    if args.mode == "chat":
+        first = " ".join(args.text) if args.text else None
+        await run_chat(first)
+        return 0
 
     if args.text:
         text = " ".join(args.text)
