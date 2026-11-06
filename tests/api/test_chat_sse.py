@@ -528,6 +528,44 @@ async def test_graph_error_persists_error_message(session, spans):
     assert rows[1]["meta"] == {"status": "error"}
 
 
+# ── 输出检查 ────────────────────────────────────────────────
+
+
+async def test_output_guard_rewrites_before_delta_and_persist(session, spans):
+    """金额/措辞违规在 delta 之前整段替换，落库的也是替换后的回答。"""
+    cid = await create_conversation("u1", session=session)
+    chunks = [
+        {"classify_intent": {"intent": "退款申请", "route": "rules"}},
+        {"validate": {"order_snapshot": {"order_id": "1001", "amount": 124900}}},
+        {"judge": {"refund_judgement": {"eligible": True, "reason_code": "size"}}},
+        {"compute": {"refund_amount": 50000}},
+        {
+            "respond": {
+                "answer": "可以全额退款，本次退 500.00 元，另补偿 200.00 元。",
+                "is_placeholder": False,
+            }
+        },
+    ]
+
+    out = [
+        f
+        async for f in run_turn(
+            "尺寸不合适", cid, "t-1", graph=FakeGraph(chunks), session=session
+        )
+    ]
+
+    delta = next(f["delta"] for f in out if "delta" in f)
+    assert delta == "本次应退金额：500.00 元，具体以平台售后规则为准。"
+    assert "全额" not in delta
+    assert "200.00" not in delta
+
+    total = next(s for s in spans if s["name"] == "turn:total")
+    assert set(total["attrs"]["output_violations"]) == {"amount", "full_refund"}
+
+    rows = await load_messages(cid, session=session)
+    assert rows[1]["content"] == delta
+
+
 # ── trace ──────────────────────────────────────────────────
 
 
@@ -626,6 +664,19 @@ def test_http_streams_sse_frames(client, spans, monkeypatch):
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
     assert [f["event"] for f in _sse_frames(response.text)] == ["ack", "done"]
+
+
+def test_http_other_conversation_returns_404(client, spans, monkeypatch):
+    async def deny(*args, **kwargs):
+        raise ChatError("not_found", "会话不存在")
+
+    monkeypatch.setattr("app.main.conversation_access", deny)
+
+    response = client.post(
+        "/api/chat", json={"message": "你好", "conversation_id": 999}
+    )
+
+    assert response.status_code == 404
 
 
 def test_http_error_frame_hides_internal_detail(client, spans, monkeypatch):

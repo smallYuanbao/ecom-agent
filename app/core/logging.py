@@ -4,11 +4,27 @@
 """
 import json
 import logging
+import re
 import time
 import uuid
 from contextvars import ContextVar
 
 trace_id_var: ContextVar[str] = ContextVar("trace_id", default="-")
+
+# 密钥样式的兜底规则。真正的防线是「不把密钥传给 logger」；
+# 这里保证即使误传，落盘的文本里也看不到原文。
+SENSITIVE_PATTERNS = (
+    re.compile(r"sk-[A-Za-z0-9_-]{16,}"),
+    re.compile(r"(?i)(api[_-]?key|password|token)\s*[=:]\s*\S+"),
+    re.compile(r"(?i)bearer\s+[A-Za-z0-9._-]+"),
+)
+
+
+def redact(text: str) -> str:
+    """把日志文本里的密钥、密码、token、Bearer 头替换成 `***`。"""
+    for pattern in SENSITIVE_PATTERNS:
+        text = pattern.sub("***", text)
+    return text
 
 
 def new_trace_id() -> str:
@@ -22,7 +38,7 @@ class JsonFormatter(logging.Formatter):
             "level": record.levelname,
             "trace_id": trace_id_var.get(),
             "logger": record.name,
-            "msg": record.getMessage(),
+            "msg": redact(record.getMessage()),
         }
         for key in ("node", "tool", "conv", "event", "duration_ms"):
             if hasattr(record, key):

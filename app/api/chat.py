@@ -36,6 +36,7 @@ from app.config import get_settings
 from app.core import slot_fill
 from app.core.history import load_window, save_assistant_message, save_user_message
 from app.core.lock import BusyError, conversation_lock
+from app.core.output_guard import guard_answer, output_context
 from app.core.session_state import (
     apply_flow_decision,
     clear_flow,
@@ -114,6 +115,25 @@ async def _capture_refund_draft(final: dict) -> dict | None:
     if not extracted:
         return None
     return {**draft, **extracted}
+
+
+async def conversation_access(
+    conversation_id: int | None,
+    *,
+    user_id: str,
+    session: AsyncSession | None = None,
+) -> None:
+    """SSE 建立前的会话归属预检。
+
+    必须在返回 `StreamingResponse` 之前调用：状态码一旦发出，后面只能回 `error` 帧。
+    不存在 / 越权 / 已软删都抛同一个 `not_found`，不泄露存在性。
+    """
+    if conversation_id is None:
+        return
+    try:
+        await get_conversation(conversation_id, user_id=user_id, session=session)
+    except NotFound as exc:
+        raise ChatError("not_found", "会话不存在") from exc
 
 
 async def _save_error_message(cid: int, session: AsyncSession | None) -> None:
@@ -342,6 +362,15 @@ async def _run_turn_locked(
     answer = final.get("answer") or ""
     actions = list(final.get("actions") or [])
 
+    # 输出兜底：金额只能来自 compute / 工具结果，承诺和系统提示泄露一律整段替换。
+    # 必须在 delta 之前、落库之前——用户看到和回放的都得是 guard 之后的回答。
+    guarded = guard_answer(answer, output_context(final))
+    answer = guarded.answer
+    # actions 里可能有 `transfer_human`，也可能是 `resume_flow` / `park_flow` / `transfer_human` 的组合。
+    if guarded.action and guarded.action not in actions:
+        # 兜底动作：如果输出被替换成兜底回答，必须加一个转人工动作，避免用户看了回答却没出口。
+        actions.append(guarded.action)
+
     # 本轮没接回、旧流程还在、又答完了新话题 → park：保留旧流程并提示
     decision = decide_flow(
         final,
@@ -381,6 +410,7 @@ async def _run_turn_locked(
             "citations": len(citations),
             "parked": decision.parked_flow is not None,
             "flow_replaced": decision.replaced_flow is not None,
+            "output_violations": list(guarded.violations),
         },
     )
 

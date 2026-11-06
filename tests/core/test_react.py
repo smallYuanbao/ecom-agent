@@ -222,8 +222,12 @@ def test_price_rows_are_converted_to_text():
     assert out["rows"][0] == {"price_text": "1299.00 元", "stock": 42}
 
 
-def test_result_is_truncated():
+def test_result_is_truncated_and_wrapped():
     payload = {"text": "x" * (react.MAX_RESULT_CHARS + 100)}
-    content = react._content(payload)
-    assert len(content) <= react.MAX_RESULT_CHARS + len("…(截断)")
-    assert content.endswith("…(截断)")
+    content = react._tool_content(payload)
+    assert content.startswith("<tool_result>")
+    assert content.endswith("</tool_result>")
+    assert "…(截断)" in content
+    assert len(content) <= (
+        react.MAX_RESULT_CHARS + len("…(截断)") + len("<tool_result></tool_result>")
+    )

@@ -19,6 +19,7 @@ from datetime import datetime
 
 from app.core.format import yuan_text
 from app.core.llm import ToolChatReply, tool_chat
+from app.core.prompts import PROMPT_GUARD
 from app.core.retrieval import search as search_kb
 from app.core.tracer import record_span
 from app.db.models import utcnow
@@ -229,11 +230,11 @@ class ReactResult:
     code: str                     # ok / step_limit / error
 
 
-def _content(payload: dict) -> str:
+def _tool_content(payload: dict) -> str:
     text = json.dumps(payload, ensure_ascii=False, default=str)
     if len(text) > MAX_RESULT_CHARS:
         text = text[:MAX_RESULT_CHARS] + "…(截断)"
-    return text
+    return f"<tool_result>{text}</tool_result>"
 
 
 def _assistant_message(reply: ToolChatReply) -> dict:
@@ -354,7 +355,9 @@ async def run(
 ) -> ReactResult:
     """跑一次只读 ReAct，最多 `MAX_STEPS` 步。"""
     started = utcnow()
-    messages: list[dict] = [{"role": "system", "content": REACT_SYSTEM}]
+    messages: list[dict] = [
+        {"role": "system", "content": REACT_SYSTEM + PROMPT_GUARD}
+    ]
     for item in (history or [])[-HISTORY_MESSAGES:]:
         role = item.get("role")
         content = (item.get("content") or "").strip()
@@ -411,7 +414,7 @@ async def run(
                 {
                     "role": "tool",
                     "tool_call_id": call.id,
-                    "content": _content(result),
+                    "content": _tool_content(result),
                 }
             )
 

@@ -12,7 +12,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.llm import chat
-from app.core.prompts import SUMMARY_SYSTEM
+from app.core.prompts import PROMPT_GUARD, SUMMARY_SYSTEM
 from app.db.repo_conversation import set_summary
 from app.db.repo_message import append_message, list_messages
 
@@ -175,7 +175,7 @@ async def maybe_summarize(
         new_summary = await asyncio.wait_for(
             chat(
                 [
-                    {"role": "system", "content": SUMMARY_SYSTEM},
+                    {"role": "system", "content": SUMMARY_SYSTEM + PROMPT_GUARD},
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.2,

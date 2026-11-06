@@ -42,7 +42,7 @@ async def test_summary_is_included_in_prompt(monkeypatch):
     user_content = captured["messages"][-1]["content"]
     assert "早前对话摘要：用户之前问过订单1001" in user_content
     assert "用户: 订单1001 到哪了" in user_content
-    assert "用户这句话：那单呢" in user_content
+    assert "<user_input>那单呢</user_input>" in user_content
 
 
 async def test_empty_history_short_circuits(monkeypatch):

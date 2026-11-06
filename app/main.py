@@ -10,12 +10,12 @@ import logging
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from openai import APITimeoutError
 from pydantic import BaseModel, Field
 
-from app.api.chat import ChatError, run_turn
+from app.api.chat import ChatError, conversation_access, run_turn
 from app.config import get_settings, validate_or_die
 from app.core.kb_version import cached_kb_version
 from app.core.logging import new_trace_id, setup_logging, trace_id_var
@@ -85,6 +85,14 @@ async def chat(req: ChatRequest) -> StreamingResponse:
 
     **不把内部异常信息透给用户**——只给一句标准话术，细节进日志（带 trace_id）。
     """
+    # 会话归属必须在 SSE 建立之前判断：状态码一旦发出，后面只能回 error 帧。
+    try:
+        await conversation_access(
+            req.conversation_id, user_id=get_settings().demo_user_id
+        )
+    except ChatError as exc:
+        raise HTTPException(status_code=404, detail="Not Found") from exc
+
     trace_id = trace_id_var.get()
 
     async def event_stream():
