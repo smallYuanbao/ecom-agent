@@ -16,19 +16,19 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from app.graph.data_exit import build_data_graph
+from app.graph.fallback_agent import build_fallback_graph
 from app.graph.knowledge import build_knowledge_graph
 from app.graph.nodes import (
     classify_intent,
-    fallback_exit,
     human_exit,
     resolve_reference,
 )
-from app.graph.routing import route_by_intent
+from app.graph.routing import ROUTE_NAMES, route_by_intent
 from app.graph.rules_exit import build_rules_graph
 from app.graph.state import ConversationState
 
 # 出口节点名（与路由表的取值、trace 里的名字保持一致）
-EXIT_NODES: tuple[str, ...] = ("knowledge", "data", "rules", "human", "fallback")
+EXIT_NODES: tuple[str, ...] = ROUTE_NAMES
 
 
 def build_graph() -> CompiledStateGraph:
@@ -41,7 +41,7 @@ def build_graph() -> CompiledStateGraph:
     g.add_node("data", build_data_graph())               # Ch04：5 状态数据查询子图
     g.add_node("rules", build_rules_graph())             # Ch03：9 状态退款子图
     g.add_node("human", human_exit)                      # Task 8 换成真实话术
-    g.add_node("fallback", fallback_exit)                # Task 8 换成三脚本
+    g.add_node("fallback", build_fallback_graph())       # Ch05：gate → ReAct / 三脚本
 
     g.set_entry_point("resolve_reference")
     g.add_edge("resolve_reference", "classify_intent")

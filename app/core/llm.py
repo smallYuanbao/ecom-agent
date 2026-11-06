@@ -16,12 +16,16 @@
 | 网络/鉴权异常 | 密钥错、超时、限流（不可恢复） | 直接上抛，由 API 层回 `error` 帧 |
 """
 import json
+import logging
+from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 
 from openai import AsyncOpenAI
 
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 # 单次结构化调用的超时（秒）。没有它，一次卡住会拖垮整轮 30s 预算（C5）
 TIMEOUT_SECONDS = 30.0
@@ -105,3 +109,66 @@ async def chat(
         temperature=temperature,
     )
     return response.choices[0].message.content or ""
+
+
+# ── ReAct 工具循环的一步（Ch05 Task 9）────────────────────────
+
+
+@dataclass(frozen=True)
+class ToolCall:
+    id: str
+    name: str
+    args: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ToolChatReply:
+    content: str
+    tool_calls: list[ToolCall]
+
+
+def _parse_arguments(raw: str | None) -> dict[str, Any]:
+    if not raw:
+        return {}
+    try:
+        value = json.loads(raw)
+    except (TypeError, ValueError):
+        # 模型偶尔会吐不合法 JSON；当成「没给参数」，
+        # 由 ReAct 的必填校验回灌错误，让它下一轮修正。
+        logger.warning("tool_calls.arguments 不是合法 JSON，按空参数处理")
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+async def tool_chat(
+    messages: list[dict[str, Any]],
+    tools: list[dict[str, Any]],
+    *,
+    temperature: float = 0.2,
+) -> ToolChatReply:
+    """多轮工具调用的一步：返回文本或 tool_calls。
+
+    - `tools` 为空时不传 `tools` 字段，强制模型直接回答（用于步数用尽时收敛）；
+    - **不重试**：工具循环的下一步会自然纠偏；网络/鉴权错误照常上抛。
+    """
+    client = get_client()
+    kwargs: dict[str, Any] = {
+        "model": get_settings().chat_model,
+        "messages": messages,
+        "temperature": temperature,
+    }
+    if tools:
+        kwargs["tools"] = tools
+        kwargs["tool_choice"] = "auto"
+
+    response = await client.chat.completions.create(**kwargs)
+    message = response.choices[0].message
+    calls = [
+        ToolCall(
+            id=call.id,
+            name=call.function.name,
+            args=_parse_arguments(call.function.arguments),
+        )
+        for call in (message.tool_calls or [])
+    ]
+    return ToolChatReply(content=message.content or "", tool_calls=calls)
