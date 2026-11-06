@@ -1,8 +1,8 @@
 """会话仓库。
 
 `active_flow / pending_question / draft` 三个字段是跨轮状态锚点（M4）：
-- `active_flow`：当前在跑哪个流程（refund / price_protection）
-- `pending_question`：正在等用户补什么（order_id / confirm）
+- `active_flow`：当前在跑哪个流程（refund / data）
+- `pending_question`：正在等哪个槽（order_id / sku_id / spec / reason_code）
 - `draft`：已收集的要素，JSON 存
 """
 import json
@@ -54,6 +54,29 @@ async def set_flow(
         conv.pending_question = pending_question
         conv.draft = None if draft is None else json.dumps(draft, ensure_ascii=False)
         conv.updated_at = utcnow()
+
+
+async def set_summary(
+    cid: int,
+    summary: str,
+    upto_msg_id: int,
+    *,
+    session: AsyncSession | None = None,
+) -> bool:
+    """写滚动摘要与边界，返回是否真的前进。
+
+    **边界只向前移**：并发或重试时，旧的摘要任务不能把边界拉回去，
+    否则已经压掉的消息会重新出现在窗口里。
+    """
+    async with session_scope(session) as s:
+        conv = await _load(s, cid)
+        current = conv.summary_upto_msg_id or 0
+        if upto_msg_id <= current:
+            return False
+        conv.summary = summary
+        conv.summary_upto_msg_id = upto_msg_id
+        conv.updated_at = utcnow()
+        return True
 
 
 async def clear_flow(cid: int, *, session: AsyncSession | None = None) -> None:

@@ -382,3 +382,69 @@ def kb_answer_messages(query: str, evidence: list[dict]) -> list[dict[str, str]]
             ),
         },
     ]
+
+
+SUMMARY_SYSTEM = """把下面的客服对话压成一段事实摘要。
+
+只保留：用户身份线索、订单号、诉求、已确认的要素、系统承诺。
+不写推测，不写客套话，不要加标题。输出纯文本，不超过 150 字。"""
+
+
+# ── 指代消解（Ch05 M3）────────────────────────────────────────
+
+COREF_TOOL_NAME = "emit_resolved_query"
+COREF_PARAMETERS: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "resolved_query": {
+            "type": "string",
+            "description": "补全指代与省略后的完整问句；补不出来就原样返回",
+        }
+    },
+    "required": ["resolved_query"],
+}
+
+COREF_SYSTEM = """你是客服对话在检索/判意图之前的「问题补全器」。
+把用户这一轮依赖上下文才看得懂的话，结合最近对话，改写成一句脱离对话也能独立看懂的完整问题。
+
+规则：
+1. 只补指代（那单 / 这个 / 它）和省略，不增删事实。
+2. 口语、模糊、带情绪的问法归一成简洁的标准问法，保留关键实体（型号、品类、订单号、政策词）。
+3. 指代指向某笔订单时，必须把订单号带上，不能只补商品名——同一商品可能有多单，
+   只给商品名下游锁不到是哪一单。
+4. 问平台通用规则的问题（如「支持花呗分期吗」「运费怎么算」），不要因为上文聊过订单
+   就硬塞订单号或商品名——绑上之后检索反而查不到通用政策。
+5. 用户这句话本身已完整、指代已明确时，原样返回，不要引入历史里没有的信息。
+6. 不要回答问题，只输出改写后的一句问题。
+
+输出放到 resolved_query。"""
+
+
+def coref_messages(
+    query: str, history: list[dict], summary: str | None = None
+) -> list[dict[str, str]]:
+    """系统指令 + 摘要行 + 最近几条对话 + 当前问句。
+
+    **摘要行也要带上**：跨滑窗的指代（「最开始那个订单」）只能靠摘要兜住。
+    只取 user / assistant；tool 结果对指代帮助不大，反而会挤占上下文。
+    """
+    lines: list[str] = []
+    if summary:
+        lines.append(f"早前对话摘要：{summary}")
+
+    history_lines: list[str] = []
+    for item in history:
+        role = item.get("role")
+        content = (item.get("content") or "").strip()
+        if role in {"user", "assistant"} and content:
+            label = "用户" if role == "user" else "客服"
+            history_lines.append(f"{label}: {content}")
+    if history_lines:
+        lines.append("最近对话：\n" + "\n".join(history_lines))
+
+    lines.append(f"用户这句话：{query}")
+    lines.append("补全后的完整问题：")
+    return [
+        {"role": "system", "content": COREF_SYSTEM},
+        {"role": "user", "content": "\n\n".join(lines)},
+    ]

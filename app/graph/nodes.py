@@ -4,23 +4,55 @@
 节点名出现在 trace / 边 / 路由表 / SSE 帧里，是**跨章不变的契约**；
 函数体则在后续章节被整体替换（知识变子图、规则变 8 状态流水线）。
 """
+from app.core import coref
 from app.core.llm import LLMFormatError, structured_call
 from app.core.prompts import (
     INTENT_PARAMETERS,
     INTENT_TOOL_NAME,
     intent_messages,
 )
-from app.graph.routing import DEFAULT_INTENT, FALLBACK_ROUTE, INTENT_TO_ROUTE
+from app.core.tracer import record_span
+from app.db.models import utcnow
+from app.graph.routing import (
+    DEFAULT_INTENT,
+    FALLBACK_ROUTE,
+    INTENT_TO_ROUTE,
+    ROUTE_NAMES,
+)
 from app.graph.state import ConversationState
 
 
 async def resolve_reference(state: ConversationState) -> dict:
-    """指代消解：本章透传，`resolved_query = raw_query`。
+    """指代消解：把「那单 / 这个 / 它」补成完整问句（M3）。
 
-    Ch05 换成真实实现（结合历史把「它 / 这个 / 那单」补成完整问句），
-    节点名与下游读的字段都不变。
+    - **resume 轮直接透传**：用户回「1001」是在补槽位，不需要改写；
+    - 其余交给 `coref.resolve`；失败时它自己回落原句，不会阻断本轮；
+    - `resolved_query` 是下游唯一读的字段，`raw_query` 永远保留原文。
     """
-    return {"resolved_query": state.get("raw_query", "")}
+    raw = state.get("raw_query", "")
+    if state.get("resume_route"):
+        return {"resolved_query": raw, "resumed": True}
+
+    history = state.get("history") or []
+    summary = state.get("summary")
+    started = utcnow()
+    resolved, mode = await coref.resolve(raw, history, summary=summary)
+    trace_id = state.get("trace_id")
+    if trace_id:
+        await record_span(
+            trace_id=trace_id,
+            name="coref",
+            start_at=started,
+            end_at=utcnow(),
+            attrs={
+                "mode": mode,
+                "history_count": len(history),
+                "summary_used": bool(summary),
+                "before": raw[:200],
+                "after": resolved[:200],
+            },
+        )
+    return {"resolved_query": resolved, "resumed": False}
 
 
 async def classify(query: str) -> tuple[str, float, bool]:
@@ -66,6 +98,16 @@ async def classify_intent(state: ConversationState) -> dict:
     `multi_intent` **暂不写进 state**：本章没有消费者（单轮、无追问），
     等 Ch05 做多意图澄清时再落 state + `pending_question`。
     """
+    # 槽位命中后由 API 写 resume_route：不调模型，直接回原出口
+    resume = state.get("resume_route")
+    if resume in ROUTE_NAMES:
+        return {
+            "intent": state.get("intent"),
+            "intent_confidence": 1.0,
+            "route": resume,
+            "resumed": True,
+        }
+
     query = state.get("resolved_query") or state.get("raw_query", "")
     intent, confidence, _multi_intent = await classify(query)
     return {

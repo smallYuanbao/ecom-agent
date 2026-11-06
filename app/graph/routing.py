@@ -36,6 +36,9 @@ DEFAULT_INTENT = "其他"
 
 FALLBACK_ROUTE = "fallback"
 
+# 五个出口的节点名。build.py 与 resume 短路共用一份，避免两处漂移
+ROUTE_NAMES: tuple[str, ...] = ("knowledge", "data", "rules", "human", "fallback")
+
 
 def route_by_intent(state: ConversationState) -> str:
     """条件边函数：只返回节点名，不写 state（条件边没有写权限）。

@@ -13,6 +13,11 @@ class ConversationState(TypedDict, total=False):
     conversation_id: int | None   # 会话 id，同时是图的 thread_id(D5)；None = 新会话
     user_id: str                  # 当前用户；订单归属校验靠它（Ch06 换成真实鉴权）
     raw_query: str                # 用户原话，永不改写；审计与回放看它
+    history: list[dict]           # 上一轮及更早的窗口消息 [{id,role,content}]（Ch05）
+    summary: str | None           # 滚动摘要；没有就是 None（Ch05）
+    resume_route: str | None      # 槽位命中后要回的出口；None = 正常分类（Ch05 Task 6）
+    resumed: bool                 # 本轮是否接回未完成流程（Ch05）
+    needs_tools: bool             # E 出口 gate：值不值得进只读 ReAct（Ch05 Task 10）
 
     # ── 中间产物：节点依次写入 ────────────────────────────────────
     resolved_query: str           # 补全后的完整问句；本章 = raw_query（透传，Ch05 真做）
@@ -32,7 +37,8 @@ class ConversationState(TypedDict, total=False):
     refund_judgement: dict           # judge 输出 {eligible, reason_code, confidence, cited_article?}
     refund_amount: int               # compute 算出的应退金额（分）
     compliance_violation: str | None # 触红线 / 复算不一致的原因；None = 通过
-    pending_question: str | None     # need_info 的追问话术；非空 = 在等用户回答
+    pending_question: str | None     # 正在等哪个槽：order_id / sku_id / spec / reason_code
+    skip_extract: bool               # 恢复轮只补了订单号，沿用 draft，不再调抽取模型
     transfer_reason: str             # 转人工的原因（trace 与落池用）
 
     # ── B 出口：数据查询（Ch04）────────────────────────────────
