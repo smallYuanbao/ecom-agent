@@ -104,17 +104,18 @@ D 的建单（P4-3）仍待做。
 | # | 任务 | 依据 | 产出 | 验收 | 状态 |
 |---|---|---|---|---|---|
 | P5-1 | 消息落库 + `db-{id}` 锚点 | M1 | `app/core/history.py` | 锚点与 DB id 一致 | ✅ |
-| P5-2 | 窗口构建（两层） | M2 | 同上 | 超预算能裁剪 | ⏳ |
-| P5-3 | 跨轮状态读写 | M4 | `app/core/session_state.py` | 三字段持久化 | ⏳ |
-| P5-4 | 槽位填充 | M6 | `app/core/slot_fill.py` | 「1001」能接回流程 | ⏳ |
-| P5-5 | park（改话题保留） | M5 | `app/graph/nodes.py` | 问别的再回来能续 | ⏳ |
-| P5-6 | 超时清理（30 分钟） | M7 | `scripts/cleanup.py` | 过期后流程清空 | ⏳ |
-| P5-7 | 会话级锁 | M8 | `app/core/lock.py` | 并发两条只有一条执行 | ⏳ |
-| P5-8 | 演示场景 4 验收 | L8 | 手工记录 | 离开再回来完整走通 | ⏳ |
-| P5-9 | **E 出口只读 ReAct**：harness（工具注册 / 循环 / 步数封顶 / trace）+ 兜底接入 | 架构取舍讨论 | `app/core/react.py`、`app/graph/fallback_agent.py` | 规则未命中的长尾能调工具作答；写操作不在工具集；超 4 步收敛到脚本 | ⏳ |
+| P5-2 | 窗口构建（两层） | M2 | 同上 | 超预算能裁剪 | ✅ |
+| P5-3 | 跨轮状态读写 | M4 | `app/core/session_state.py` | 三字段持久化 | ✅ |
+| P5-4 | 槽位填充 | M6 | `app/core/slot_fill.py` | 「1001」能接回流程 | ✅ |
+| P5-5 | park（改话题保留） | M5 | `app/graph/nodes.py` | 问别的再回来能续 | ✅ |
+| P5-6 | 超时清理（30 分钟） | M7 | `scripts/cleanup.py` | 过期后流程清空 | ✅ |
+| P5-7 | 会话级锁 | M8 | `app/core/lock.py` | 并发两条只有一条执行 | ✅ |
+| P5-8 | 演示场景 4 验收 | L8 | 手工记录 | 离开再回来完整走通 | ✅ |
+| P5-9 | **E 出口只读 ReAct**：harness（工具注册 / 循环 / 步数封顶 / trace）+ 兜底接入 | 架构取舍讨论 | `app/core/react.py`、`app/graph/fallback_agent.py` | 规则未命中的长尾能调工具作答；写操作不在工具集；超 4 步收敛到脚本 | ✅ |
 | P5-10 | *(可选)* **B2**：B 出口参数失败分支接 ReAct | 同 P5-9 | 复用 `app/core/react.py` | 仅当评测显示「参数抽取失败 / 需澄清」占比 > 20% 时做 | ⏳ |
 | P5-11 | **多意图澄清**：`multi_intent=true` 时反问「您想先处理哪一件？」，`pending_question` 记住选择，下一轮接回 | M4、M6 | `app/graph/state.py`、`app/graph/nodes.py` | 双诉求输入 → 反问 → 下一轮「先查物流」能接回 data 出口 | ⏳ |
 | P5-12 | **checkpointer + `interrupt`**：图内暂停/恢复，替代 Ch03 的 DB 版追问。**触发条件**：需要"同一轮内原地续跑、不重跑已完成节点"，或人工审核要插在流程中间 | M5 | `app/graph/build.py`、`app/graph/rules_exit.py` | `need_info` 用 `interrupt` 挂起；同一 `thread_id` 恢复后从断点继续（不重跑 `intake`/`extract`）；`SqliteSaver` 落库，进程重启可恢复 | ⏳ |
+| P5-13 | **指代消解**：每轮改写 + 三个短路；失败回落原句 | M3 | `app/core/coref.py` | 「那单呢」能补全；无历史/含实体/resume 轮不调模型 | ✅ |
 
 **P5-12 为什么单列**：Ch03 Task 5 的 `need_info` 已经把追问做成了"写 `pending_question` → 下一轮重跑"，
 用户体验能跑通，但**每轮都从头执行**。`interrupt` 换来的是"断点续跑"，

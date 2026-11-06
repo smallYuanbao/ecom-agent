@@ -9,6 +9,7 @@
 | Ch02 | 主流程骨架 + RAG 检索与评测 | [ch02-retrieval-skeleton.md](./ch02-retrieval-skeleton.md) |
 | Ch03 | 退款流水线：模型判定 + 代码复算 | [ch03-refund.md](./ch03-refund.md) |
 | Ch04 | 数据查询：零模型调用、固定链、模板回答 | [ch04-data-exit.md](./ch04-data-exit.md) |
+| Ch05 | 多轮与上下文 + E 出口只读 ReAct | [ch05-multi-turn.md](./ch05-multi-turn.md) |
 | 数据库 | 索引 / 事务 / WAL / async ORM 的详细问答 | [database-qa.md](./database-qa.md) |
 | 自测 | 抽题表、评分标准、模拟面试与演示脚本 | [self-test.md](./self-test.md) |
 
@@ -23,8 +24,9 @@
 
 | 主线 | 出现在 | 一句话 |
 |---|---|---|
-| **确定性 vs 模型** | Ch02 路由、Ch03 判定、Ch04 零模型 | 能查表的不让模型决定；模型只做理解和表达 |
-| **fail-closed** | Ch02 证据闸、Ch03 三处闸、Ch04 工具异常 | 拿不准就拒答 / 转人工，不硬给结论 |
+| **确定性 vs 模型** | Ch02 路由、Ch03 判定、Ch04 零模型、Ch05 只在 E 用 ReAct | 能查表的不让模型决定；模型只做理解和表达 |
+| **fail-closed** | Ch02 证据闸、Ch03 三处闸、Ch04 工具异常、Ch05 ReAct 退脚本 | 拿不准就拒答 / 转人工，不硬给结论 |
+| **状态与执行分离** | Ch05 三字段 + 窗口 + 锁 | 业务状态进 DB，执行现场不跨轮 |
 | **评测要能区分被测对象** | Ch02 三策略、Ch03 两组 gold set | 规则满分时要另造难题，否则测不出模型价值 |
 | **失败样本比总分有用** | 全章 | 每条未命中的归因（模型 / 规则 / 数据）决定下一步修什么 |
 

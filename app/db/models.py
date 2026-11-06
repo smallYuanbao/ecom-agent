@@ -53,8 +53,8 @@ class Conversation(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime)         # K5 软删
     summary: Mapped[str | None] = mapped_column(Text)                     # M2 滚动摘要
     summary_upto_msg_id: Mapped[int | None] = mapped_column(Integer)      # M2 摘要覆盖到哪
-    active_flow: Mapped[str | None] = mapped_column(String)               # M4 refund / price_protection
-    pending_question: Mapped[str | None] = mapped_column(String)          # M4 order_id / confirm
+    active_flow: Mapped[str | None] = mapped_column(String)               # M4 当前流程：refund / data
+    pending_question: Mapped[str | None] = mapped_column(String)          # M4 等哪个槽：order_id / sku_id / spec / reason_code
     draft: Mapped[str | None] = mapped_column(Text)                       # M4 JSON 已收集要素
 
 

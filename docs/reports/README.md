@@ -21,6 +21,7 @@
 | [ch02-acceptance.md](./ch02-acceptance.md) | 主流程骨架验收 |
 | [ch03-acceptance.md](./ch03-acceptance.md) | 退款流水线验收：清单、指标、转人工路径、延迟、局限 |
 | [ch04-acceptance.md](./ch04-acceptance.md) | 数据查询验收：三类查询、边界场景、延迟、零模型调用 |
+| [ch05-acceptance.md](./ch05-acceptance.md) | 多轮与 ReAct 验收：六条场景、park、指代、延迟、发现的问题 |
 
 ## 三、评测报告（有数据、有结论）
 
@@ -57,6 +58,7 @@
 | [../interview/ch02-retrieval-skeleton.md](../interview/ch02-retrieval-skeleton.md) | Ch02：查表路由、检索选型、证据闸、RAG 评测 |
 | [../interview/ch03-refund.md](../interview/ch03-refund.md) | Ch03：模型判定 + 代码复算、评测设计、踩坑故事 |
 | [../interview/ch04-data-exit.md](../interview/ch04-data-exit.md) | Ch04：零模型调用、固定链、越权防枚举、模板回答 |
+| [../interview/ch05-multi-turn.md](../interview/ch05-multi-turn.md) | Ch05：DB 三字段恢复、窗口、park、锁、只读 ReAct |
 | [../interview/database-qa.md](../interview/database-qa.md) | 数据库问答：索引 / 事务 / WAL / async ORM |
 | [../interview/self-test.md](../interview/self-test.md) | 自测方法：抽题表、评分标准、模拟面试与演示脚本 |
 

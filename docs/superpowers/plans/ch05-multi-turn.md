@@ -210,7 +210,14 @@ summary: str | None
 `run_turn` 在跑图前：
 
 ```python
-window = await load_window(cid)
+# 在落本轮用户消息之前读窗口：history 只放上一轮及更早，
+# 本轮输入由 raw_query 单独传，避免同一句话出现两次
+window = await load_window(
+    cid,
+    summary=conv.summary,
+    summary_upto_msg_id=conv.summary_upto_msg_id or 0,
+    session=session,
+)
 state["history"] = window.messages
 state["summary"] = window.summary
 ```
@@ -553,7 +560,7 @@ if state.get("skip_extract"):
 
 **Files:**
 - Modify: `app/core/session_state.py`、`app/api/chat.py`
-- Test: `tests/graph/test_park.py`
+- Test: `tests/core/test_session_state.py`（`decide_flow`）、`tests/api/test_chat_sse.py`（端到端）
 
 **Step 1: 判定**
 
@@ -594,7 +601,7 @@ parked = (
 用户下一轮说「继续退费」→ `slot_fill` 返回 `resume=True` → Task 6 的接回路径。
 
 **测试：**
-- 退款挂起 → 问营业时间 → 正常答 + 提示 → 「继续退费」→ 回到退款；
+- 退款挂起 → 问退货政策 → 正常答 + 提示 → 「继续退费」→ 回到退款；
 - 挂起时问另一个会追问的意图 → 新流程替换（trace `flow_replaced`）；
 - 挂起时转人工 → 旧流程清空、无提示；
 - 第 2 轮闲聊的回答里**没有退款金额/字段**。
@@ -657,6 +664,9 @@ async with conversation_lock(cid):
 - Create: `app/core/react.py`、`tests/core/test_react.py`
 - Modify: `app/core/llm.py`
 
+**本章决定**：不引入 `jsonschema`；不做重试；只做必填参数校验。
+理由：4 个固定工具参数简单，工具内部已有 `invalid_arg`；重试会放大兜底路径的延迟。
+
 **Step 1: `llm.tool_chat`**
 
 ```python
@@ -667,19 +677,32 @@ async def tool_chat(
     不重试：工具循环的下一步会自然纠偏；网络/鉴权错误照常上抛。"""
 ```
 
-**Step 2: 工具 schema**
+**Step 2: 工具 schema（轻量 `ToolSpec`）**
 
 ```python
 MAX_STEPS = 4
-TOOL_WHITELIST = ("query_order", "query_logistics", "query_stock", "search_kb")
+MAX_RESULT_CHARS = 2000
 
-TOOLS = [
-    {"type": "function", "function": {"name": "query_order", ...}},
-    {"type": "function", "function": {"name": "query_logistics", ...}},  # 参数是 order_id
-    {"type": "function", "function": {"name": "query_stock", ...}},
-    {"type": "function", "function": {"name": "search_kb", ...}},
-]
+@dataclass(frozen=True)
+class ToolSpec:
+    name: str
+    description: str
+    parameters: dict          # 给模型看的 JSON Schema
+    required: tuple[str, ...]
+    timeout: float = 5.0
+
+TOOL_SPECS = {
+    "query_order": ToolSpec(...),
+    "query_logistics": ToolSpec(...),   # 参数是 order_id，不是 tracking_no
+    "query_stock": ToolSpec(...),
+    "search_kb": ToolSpec(...),
+}
+TOOL_WHITELIST = tuple(TOOL_SPECS)
+TOOLS = [{"type": "function", "function": {...}} for spec in TOOL_SPECS.values()]
 ```
+
+**不上 `jsonschema`**：`_execute` 只检查 `spec.required` 里的键是否存在；
+类型归一在参数进入工具前做（`order_id`/`sku_id` 转字符串、SKU 转大写）。
 
 **Step 3: 执行器**
 
@@ -694,9 +717,18 @@ async def _execute(name: str, args: dict, *, user_id: str) -> dict
 | `query_stock` | `tools.orders.query_stock(sku_id, spec)` |
 | `search_kb` | `retrieval.search(query, top_k=3)` |
 
+**固定管道**（借鉴 MewHelp，但去掉 Schema 全量与重试）：
+
+```
+白名单 → 必填校验 → 丢弃 user_id / 未知参数 → 类型归一
+       → asyncio.wait_for(timeout) → ToolResult
+       → 结果截断（≤2000 字）→ span
+```
+
 - `args` 里的 `user_id` 一律丢弃（schema 里也没有）；
-- 工具 `ToolResult` → `{"ok":..., "code":..., "data":...}`；
-- 任何异常 → `{"code": "internal"}`，**不抛**。
+- 工具 `ToolResult` → `{"code":..., "data":...}`；
+- 任何异常 / 超时 → `{"code": "timeout" / "internal"}`，**不抛**；
+- 结果 JSON 超过 `MAX_RESULT_CHARS` 截断，原文进 trace。
 
 **Step 4: 循环**
 
@@ -716,6 +748,14 @@ step 用尽：不带工具再调一次，强制回答
 
 - 每步一行 `react:step:N` span；父 span `react:total`；
 - `code`：`ok` / `step_limit` / `error`。
+
+**Prompt 规则**（借鉴 MewHelp 的 `AGENT_SYSTEM`）：
+
+- 只读；不要尝试下单/退款/建单；
+- 查不到就如实说，不编造；
+- 信息够了就回答，不要反复调工具；
+- `search_kb` 有证据才答，关键结论标 `[1][2]`；证据不足就说没查到；
+- 不承诺时效/赔偿。
 
 **测试：**
 - 无工具直接回答（1 步）；
@@ -791,7 +831,7 @@ g.add_node("fallback", build_fallback_graph())
 用 `scripts/try.py chat` 跑 spec 的验收场景：
 
 1. 退款 →「1001」；
-2. 退款 →「你们几点上班」→「继续退费」→「1001」；
+2. 退款 →「退货政策是什么」→「继续退费」→「1002」；
 3. 退款 →「你好」；
 4. 「订单1001 到哪了」→「那单呢」；
 5. 「订单1001 的物流到哪了，顺便看下 ST-20 还有货吗」；

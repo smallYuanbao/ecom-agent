@@ -45,7 +45,7 @@ Python / SQLAlchemy / FastAPI / SQLite
 - "为什么模型 7/10 还敢上线？" → 答：流水线有 `compliance` 兜底，分歧必转人工；
   错放率 0%，没有出现"该拒的判成可退"。
 
-### 阶段 3 · Ch05 + 兜底 ReAct 完成后，换标题
+### 阶段 3 · Ch05 完成后，换标题（已满足）
 
 ```
 ecom-agent · 电商售后客服 Agent —— 确定性 Workflow + 只读 ReAct 混合架构
@@ -61,6 +61,10 @@ Python / LangGraph / FastAPI / SQLite / Chroma
 
 · 判定评测：30 条人工标注 gold set（简单组 20 / 困难组 10），
   简单组 20/20 不退化；困难组模型 7/10 vs 规则 2/10；错放率 0%。
+
+· 多轮上下文：消息落库 + 滑动窗口 + 滚动摘要；跨轮用
+  `active_flow / pending_question / draft` 三字段恢复，槽位命中后短路分类；
+  改话题 park、30 分钟失效、会话级锁串行。
 
 · 兜底长尾：兜底出口引入只读 ReAct Agent（4 个白名单工具、4 步封顶、
   调用链落 trace），承接未预定义意图；写操作一律不进工具集。
@@ -90,7 +94,8 @@ HR 扫读能命中关键词；「混合架构」这四个字本身就是取舍�
 | 30 条 gold set + 三列指标 | `scripts/eval_refund.py`、`docs/reports/refund-eval.md` | ✅ | 模型 / 规则 / 流水线分别是什么？为什么验收卡模型？ |
 | 四类转人工集成测试 | `tests/graph/rules/test_transfer_paths.py` | ✅ | 哪四类？打桩了哪些依赖？ |
 | 评测样本量的统计意识 | `refund-eval.md` §七、P7-8 | ✅ | 10 条够吗？CI 多宽？怎么扩？ |
-| 只读 ReAct + 4 步封顶 | Ch05 后（P5-9） | ⏳ | 为什么只读？步数为什么是 4？ |
+| 只读 ReAct + 4 步封顶 | `app/core/react.py`、`fallback_agent.py` | ✅ | 为什么只读？步数为什么是 4？ |
+| 多轮：三字段 + 窗口 + park + 锁 | `app/core/session_state.py`、`history.py`、`lock.py` | ✅ | 为什么不用 checkpointer？ |
 | 幂等去重 | `repo_message.append_message` | ✅ | 并发重试怎么办？ |
 | trace_span 每节点一行 | `app/core/tracer.py`、子图 `_traced` | ✅ | 怎么还原调用树？ |
 
@@ -100,15 +105,14 @@ HR 扫读能命中关键词；「混合架构」这四个字本身就是取舍�
 
 | 词 | 为什么 | 什么时候能写 |
 |---|---|---|
-| ReAct / Agent 循环 | E 出口 ReAct 未实现 | Ch05 后 P5-9 完成 |
-| 多轮对话 / 上下文窗口 | Ch05 未开始 | Ch05 完成 |
 | **精确的准确率数字**（如「判定准确率 70%」） | n=10 的 95% CI ≈ [40%, 89%]，只能讲方向 | P7-8 扩到 n≥20 且留盲测后 |
 | 任何准确率、延迟、成本数字 | 必须有 `docs/reports/` 的运行记录 | 有记录才写，并注明样本量 |
 | 高并发 / 支撑 QPS | 无压测 | 不做压测就别写 |
 | 线上 / 生产环境 | 从未部署 | 保持「本地可运行」的表述 |
 
 > **可以写**：混合检索 / RRF / hit@3（Ch02 已完成，见 `retrieval-eval.md`）、
-> 端到端 P95 4.72s（n=5，见 `ch03-acceptance.md`）。
+> 端到端 P95 4.72s（n=5，见 `ch03-acceptance.md`）、
+> 多轮退款轮中位 3.62s / ReAct 中位 2.59s（n=5，见 `ch05-acceptance.md`）。
 
 ---
 

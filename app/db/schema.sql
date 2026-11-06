@@ -13,8 +13,8 @@ CREATE TABLE IF NOT EXISTS conversations (
   deleted_at         DATETIME,                       -- K5 软删；非空视为已删除
   summary            TEXT,                           -- M2 早期对话滚动摘要
   summary_upto_msg_id INTEGER,                       -- M2 摘要覆盖到哪条消息
-  active_flow        TEXT,                           -- M4 refund / price_protection / NULL
-  pending_question   TEXT,                           -- M4 order_id / confirm / NULL
+  active_flow        TEXT,                           -- M4 当前流程：refund / data / NULL
+  pending_question   TEXT,                           -- M4 等哪个槽：order_id / sku_id / spec / reason_code / NULL
   draft              TEXT                            -- M4 JSON：已收集的要素
 );
 
