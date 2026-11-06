@@ -95,7 +95,7 @@ grep -rn "替换：Ch02 §1" docs/reports/
 | Ch03 | C 出口（退款规则） | [ch03-rules-exit-changes.md](./ch03-rules-exit-changes.md) | ✅ 18 / 18 节（验收见 [ch03-acceptance.md](./ch03-acceptance.md)） |
 | Ch04 | B 出口（数据查询） | [ch04-data-exit-changes.md](./ch04-data-exit-changes.md) | ✅ 9 / 9 节（验收见 [ch04-acceptance.md](./ch04-acceptance.md)） |
 | Ch05 | 多轮与上下文 | [ch05-multi-turn-changes.md](./ch05-multi-turn-changes.md) | ✅ 11 / 11 节（验收见 [ch05-acceptance.md](./ch05-acceptance.md)） |
-| Ch06 | 安全 | `ch06-security-changes.md` | ⏳ |
+| Ch06 | 安全 | [ch06-security-changes.md](./ch06-security-changes.md) | ✅ 6 / 6 节（验收见 [ch06-acceptance.md](./ch06-acceptance.md)） |
 | Ch07 | 评测 | `ch07-eval-changes.md` | ⏳ |
 | Ch08 | 前端 | `ch08-frontend-changes.md` | ⏳ |
 

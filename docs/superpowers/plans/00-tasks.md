@@ -137,13 +137,13 @@ D 的建单（P4-3）仍待做。
 
 | # | 任务 | 依据 | 产出 | 验收 | 状态 |
 |---|---|---|---|---|---|
-| P6-1 | 归属校验测试补全 | S1 | `tests/security/test_security.py` | 越权 3 例 | ⏳ |
-| P6-2 | 会话归属 404 | S2 | `app/api/chat.py` | 猜 id 返回 404 | ⏳ |
-| P6-3 | Prompt 四区结构 | S3 | `app/core/prompts.py` | 用户/检索/工具内容包裹 | ⏳ |
-| P6-4 | 工具校验装饰器 | S4 | `app/tools/decorators.py` | 统一注入+校验 | ⏳ |
-| P6-5 | 输出检查（金额/措辞）。**机械校验优先**：金额必须等于 `compute` 输出、订单字段必须来自工具返回值，不用模型判 | S6 | `app/core/output_guard.py` | 违规回答被改写；两条机械校验各有反向用例 | ⏳ |
-| P6-6 | 日志收口 + 密钥检查 | S5 | `app/core/logging.py` | 日志里搜不到 key | ⏳ |
-| P6-7 | 五个必测场景 | S1–S6 | `tests/security/test_security.py` | 全部通过 | ⏳ |
+| P6-1 | 归属校验测试补全 | S1 | `tests/security/test_ownership.py` | 越权 3 例 | ✅ |
+| P6-2 | 会话归属 404 | S2 | `app/api/chat.py` | 猜 id 返回 404 | ✅ |
+| P6-3 | Prompt 四区结构 | S3 | `app/core/prompts.py` | 用户/检索/工具内容包裹 | ✅ |
+| P6-4 | 工具校验**静态守卫**（不新增装饰器） | S4 | `tests/security/test_ownership.py` | 仓库 keyword-only + schema 无 user_id | ✅ |
+| P6-5 | 输出检查（金额/措辞）。**机械校验优先**：金额必须等于 `compute` 输出、订单字段必须来自工具返回值，不用模型判 | S6 | `app/core/output_guard.py` | 违规回答被改写；两条机械校验各有反向用例 | ✅ |
+| P6-6 | 日志收口 + 密钥检查 | S5 | `app/core/logging.py` | 日志里搜不到 key | ✅ |
+| P6-7 | 五个必测场景 | S1–S6 | `tests/security/test_scenarios.py` | 全部通过 | ✅ |
 
 ---
 

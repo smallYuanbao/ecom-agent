@@ -13,6 +13,7 @@
 | [ch03-rules-exit-changes.md](./ch03-rules-exit-changes.md) | C 出口：退款 9 状态流水线、判定、评测 |
 | [ch04-data-exit-changes.md](./ch04-data-exit-changes.md) | B 出口：订单 / 物流 / 库存查询 |
 | [ch05-multi-turn-changes.md](./ch05-multi-turn-changes.md) | 多轮：消息落库、锚点、窗口、指代、park、ReAct |
+| [ch06-security-changes.md](./ch06-security-changes.md) | 安全：越权、404、Prompt 四区、输出检查、日志 |
 
 ## 二、验收报告（一章做完时写）
 
@@ -22,6 +23,7 @@
 | [ch03-acceptance.md](./ch03-acceptance.md) | 退款流水线验收：清单、指标、转人工路径、延迟、局限 |
 | [ch04-acceptance.md](./ch04-acceptance.md) | 数据查询验收：三类查询、边界场景、延迟、零模型调用 |
 | [ch05-acceptance.md](./ch05-acceptance.md) | 多轮与 ReAct 验收：六条场景、park、指代、延迟、发现的问题 |
+| [ch06-acceptance.md](./ch06-acceptance.md) | 安全验收：越权、404、注入、输出检查、日志脱敏、已知边界 |
 
 ## 三、评测报告（有数据、有结论）
 
