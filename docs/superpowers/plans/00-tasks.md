@@ -116,6 +116,7 @@ D 的建单（P4-3）仍待做。
 | P5-11 | **多意图澄清**：`multi_intent=true` 时反问「您想先处理哪一件？」，`pending_question` 记住选择，下一轮接回 | M4、M6 | `app/graph/state.py`、`app/graph/nodes.py` | 双诉求输入 → 反问 → 下一轮「先查物流」能接回 data 出口 | ⏳ |
 | P5-12 | **checkpointer + `interrupt`**：图内暂停/恢复，替代 Ch03 的 DB 版追问。**触发条件**：需要"同一轮内原地续跑、不重跑已完成节点"，或人工审核要插在流程中间 | M5 | `app/graph/build.py`、`app/graph/rules_exit.py` | `need_info` 用 `interrupt` 挂起；同一 `thread_id` 恢复后从断点继续（不重跑 `intake`/`extract`）；`SqliteSaver` 落库，进程重启可恢复 | ⏳ |
 | P5-13 | **指代消解**：每轮改写 + 三个短路；失败回落原句 | M3 | `app/core/coref.py` | 「那单呢」能补全；无历史/含实体/resume 轮不调模型 | ✅ |
+| P5-14 | *(后续)* **ReAct 槽位解析**：`slot_fill` 失败时复用只读 ReAct；加 `list_user_orders` / `search_products`；`ReactResult` 回填 `resolved_slot/value` | M6、P5-9 | `app/core/react.py`、`app/core/slot_fill.py`、商品目录 | 「第一单」「那个推车」能接回流程；多命中列候选，不猜 | ⏳ |
 
 **P5-12 为什么单列**：Ch03 Task 5 的 `need_info` 已经把追问做成了"写 `pending_question` → 下一轮重跑"，
 用户体验能跑通，但**每轮都从头执行**。`interrupt` 换来的是"断点续跑"，

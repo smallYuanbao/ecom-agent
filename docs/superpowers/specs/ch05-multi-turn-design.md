@@ -528,6 +528,34 @@ def build_fallback_graph() -> CompiledStateGraph
 
 ---
 
+## 后续设计：ReAct 槽位解析（P5-14，本章不做）
+
+解决「第一单」「那个推车」这类**自由表达指代**：
+
+```
+slot_fill 抽不到
+  ↓
+react.resolve_slot(pending_question, text, draft)
+  ├─ 工具 list_user_orders(index?) → 候选订单
+  ├─ 工具 search_products(keyword) → SKU 候选
+  └─ ReactResult 增加 resolved_slot / resolved_value
+  ↓
+命中且唯一 → 回填 state，接回原流程
+多命中     → select_order / select_sku 候选，不猜
+未命中     → 按新话题 park
+```
+
+**边界**：
+
+- 模型只决定「查什么」（序数/商品关键词），**不决定「是哪一个」**；
+- `list_user_orders` / `search_products` 仍是只读、注入 `user_id`；
+- 需要商品目录（`sku_id → 名称/别名/品类`），否则「推车」对应多个 SKU；
+- 这是流程内的 resolver，**不是 E 出口的 gate**——E 仍只负责兜底回答。
+
+**触发条件**：自然语言指代（序数/商品名）占追问回答 > 10%，或演示需要。
+
+---
+
 ## 本章不做
 
 | 不做 | 原因 / 触发条件 |
@@ -535,6 +563,7 @@ def build_fallback_graph() -> CompiledStateGraph
 | **P5-10 · B 出口接 ReAct** | 仅当评测显示「参数抽取失败 / 需澄清」占比 > 20% |
 | **P5-11 · 多意图澄清** | 需要分类器输出候选意图列表；当前无数据证明多意图占比高。触发：演示需要或兜底中多意图 > 5% |
 | **P5-12 · checkpointer + `interrupt`** | DB 版跨轮已能跑通；`interrupt` 换的是「同一轮内断点续跑」，代价是 thread 生命周期与重跑语义。触发：需要人工审核插在流程中间 |
+| **P5-14 · ReAct 槽位解析** | 需要 `ReactResult` 回填字段、两个只读工具与商品目录；当前用卡片点选。见上一节设计稿 |
 | 三层渲染的层 2（工具结果半压） | 当前工具消息只存一行摘要，层 2 没有素材；等 ReAct 工具结果落原文再上 |
 | 摘要段的语义筛选 | 摘要段 < 5 段，暂不需要 |
 | 多实例锁 | 本章单进程；多 worker 要 Redis / DB 锁 |

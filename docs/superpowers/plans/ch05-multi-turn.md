@@ -901,3 +901,18 @@ g.add_node("fallback", build_fallback_graph())
 | ReAct 编造 / 超时 | 只读工具、错误回灌、4 步封顶、失败退脚本 |
 | 测试碰真实库 | 沿用 `session` 夹具；ReAct / 检索在测试里打桩 |
 | 消息落库失败影响回答 | 先保证流式回答；落库异常记日志，不替换回答 |
+
+---
+
+## 后续（P5-14，本章不做）
+
+「第一单」「那个推车」这类自由表达指代，计划复用只读 ReAct 做**流程内 resolver**：
+
+1. `slot_fill` 抽不到时调用 `react.resolve_slot(pending_question, text, draft)`；
+2. 工具增加 `list_user_orders`（序数 → 候选）与 `search_products`（关键词 → SKU 候选）；
+3. `ReactResult` 增加 `resolved_slot` / `resolved_value`；
+4. 唯一命中才回填 `state`；多命中列候选，不猜；
+5. 需要商品目录（SKU → 名称/别名/品类）。
+
+**不做 E 的 gate 扩展**：这是流程内的槽位解析，不是兜底问答。
+触发条件：自然语言指代占追问回答 > 10%，或演示需要。
