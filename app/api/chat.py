@@ -33,13 +33,23 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.core.history import save_assistant_message, save_user_message
+from app.core import slot_fill
+from app.core.history import load_window, save_assistant_message, save_user_message
+from app.core.lock import BusyError, conversation_lock
+from app.core.session_state import (
+    apply_flow_decision,
+    clear_flow,
+    decide_flow,
+    load_flow,
+)
 from app.core.tracer import record_span
 from app.db.errors import NotFound
 from app.db.models import utcnow
 from app.db.repo_conversation import create_conversation, get_conversation
 from app.db.session import session_scope
 from app.graph.build import build_graph
+from app.graph.routing import INTENT_TO_ROUTE
+from app.graph.rules_exit import extract_draft
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +68,52 @@ class ChatError(Exception):
 
 def _elapsed_ms(start: datetime, end: datetime) -> int:
     return int((end - start).total_seconds() * 1000)
+
+
+def _only_order_id(text: str, order_id: str | None) -> bool:
+    """这句话是不是「只补了订单号」。
+
+    空文本（点选卡片）也算；「1001，尺寸不合适」不算——后面还要抽取新信息。
+    """
+    if not text.strip():
+        return True
+    if not order_id:
+        return False
+    return text.replace(str(order_id), "").strip(" ，,。.!！?？") == ""
+
+
+FLOW_LABELS = {"refund": "退款申请", "data": "数据查询"}
+
+
+def _with_park_notice(answer: str, flow: str) -> str:
+    """在回答尾部加一句「您还有一笔未完成流程」。"""
+    label = FLOW_LABELS.get(flow, flow)
+    notice = f"（您还有一笔未完成的{label}，需要继续吗？）"
+    return f"{answer}\n\n{notice}" if answer else notice
+
+
+async def _capture_refund_draft(final: dict) -> dict | None:
+    """C 出口缺订单号时不会走 `extract`；把用户已经说过的原因补进 draft。
+
+    只在该轮「问订单号、且 draft 还没有 reason_code」时补一次，
+    避免每轮都多调一次抽取模型。
+    """
+    if final.get("route") != "rules" or final.get("pending_question") != "order_id":
+        return None
+
+    draft = dict(final.get("refund_draft") or {})
+    if draft.get("reason_code"):
+        return None
+
+    query = final.get("resolved_query") or final.get("raw_query") or ""
+    try:
+        extracted = await extract_draft(query)
+    except Exception:
+        logger.warning("补齐退款草稿失败", exc_info=True)
+        return None
+    if not extracted:
+        return None
+    return {**draft, **extracted}
 
 
 async def _save_error_message(cid: int, session: AsyncSession | None) -> None:
@@ -103,15 +159,115 @@ async def run_turn(
     # Ch02 没有登录体系；订单归属校验需要一个固定的演示身份。
     # Ch06 接真实鉴权后改成从请求里取登录用户。
     user_id = get_settings().demo_user_id
+    if conversation_id is None:
+        cid = await create_conversation(user_id, session=session)
+    else:
+        cid = conversation_id
+
+    # 先拿锁再读会话：否则两个并发请求会各自读到「上一轮还没写库」的旧状态
     try:
-        if conversation_id is None:
-            cid = await create_conversation(user_id, session=session)
-        else:
-            await get_conversation(conversation_id, user_id=user_id, session=session)
-            cid = conversation_id
-    except NotFound as exc:
-        # 不存在与不属于本人同一句，避免会话 id 成为枚举 oracle（S1/S2）
-        raise ChatError("not_found", "会话不存在") from exc
+        async with conversation_lock(cid):
+            async for frame in _run_turn_locked(
+                cid=cid,
+                conversation_id=conversation_id,
+                user_id=user_id,
+                text=text,
+                selected_action=selected_action,
+                client_message_id=client_message_id,
+                trace_id=trace_id,
+                graph=graph,
+                session=session,
+            ):
+                yield frame
+    except BusyError as exc:
+        raise ChatError("busy", "上一条消息还在处理中，请稍后再试") from exc
+
+
+async def _run_turn_locked(
+    *,
+    cid: int,
+    conversation_id: int | None,
+    user_id: str,
+    text: str,
+    selected_action: dict | None,
+    client_message_id: str | None,
+    trace_id: str,
+    graph: Any | None,
+    session: AsyncSession | None,
+) -> AsyncIterator[dict]:
+    """锁内的一轮：读会话与流程、槽位填充、跑图、写库。"""
+    # 锁内再读会话：并发请求在等锁期间，上一轮可能已经改了 summary / 流程
+    conv = None
+    summary: str | None = None
+    summary_upto = 0
+    flow = None
+    if conversation_id is not None:
+        try:
+            conv = await get_conversation(
+                conversation_id, user_id=user_id, session=session
+            )
+        except NotFound as exc:
+            # 不存在与不属于本人同一句，避免会话 id 成为枚举 oracle（S1/S2）
+            raise ChatError("not_found", "会话不存在") from exc
+        summary = conv.summary
+        summary_upto = conv.summary_upto_msg_id or 0
+        flow = await load_flow(cid, conversation=conv, session=session)
+        if flow.expired:
+            logger.info("会话流程已过期 conv=%s", cid)
+
+    # 槽位填充：先按「当前在等什么」解析这句话，命中就直接接回原出口
+    slot = await slot_fill.fill(
+        flow.pending_question if flow else None,
+        text,
+        draft=flow.draft if flow else {},
+        selected=selected_action,
+    )
+    if slot.cancel:
+        await clear_flow(cid, session=session)
+
+    resume_route: str | None = None
+    restored: dict = {}
+    if flow is not None and not slot.cancel and (slot.resume or slot.filled):
+        intent = flow.draft.get("intent")
+        if intent in INTENT_TO_ROUTE:          # draft 损坏时不硬接
+            resume_route = INTENT_TO_ROUTE[intent]
+            restored = {
+                "intent": intent,
+                "order_id": flow.draft.get("order_id"),
+                "sku_id": flow.draft.get("sku_id"),
+                "refund_draft": flow.draft.get("refund") or {},
+                "validate_retry": flow.draft.get("validate_retry", 0),
+            }
+            if slot.slot == "order_id":
+                restored["order_id"] = slot.value
+            elif slot.slot == "sku_id":
+                restored["sku_id"] = slot.value
+            elif slot.slot in {"reason_code", "refund_extract"}:
+                restored["refund_draft"] = slot.value
+
+    # 用户答了一个槽位 / 说「继续」= 有进展，重试计数重新开始；
+    # 否则「问订单号 → 用户答 → 问原因」会被算成两次失败，直接转人工。
+    if resume_route == "rules" and (slot.resume or slot.filled):
+        restored["validate_retry"] = 0
+
+    skip_extract = resume_route == "rules" and (
+        slot.resume
+        # 退款槽位在 slot_fill 里已经调用过抽取器，出口里不能再调一次
+        or slot.slot in {"reason_code", "refund_extract"}
+        or (
+            slot.slot == "order_id"
+            and _only_order_id(text, restored.get("order_id"))
+        )
+    )
+
+    # 窗口在本轮用户消息落库之前构建：history 只放上一轮及更早，
+    # 本轮输入由 raw_query 单独传，避免同一句话出现两次。
+    window = await load_window(
+        cid,
+        summary=summary,
+        summary_upto_msg_id=summary_upto,
+        session=session,
+    )
 
     user_meta = {"selected_action": selected_action} if selected_action else None
     user_message_id = await save_user_message(
@@ -128,7 +284,14 @@ async def run_turn(
         "conversation_id": cid,
         "trace_id": trace_id,
         "user_id": user_id,
+        "history": window.messages,
+        "summary": window.summary,
+        "resume_route": resume_route,
+        "resumed": bool(resume_route),
     }
+    state.update(restored)
+    if skip_extract:
+        state["skip_extract"] = True
 
     yield {
         "event": "ack",
@@ -165,13 +328,37 @@ async def run_turn(
                         "event": "route",
                         "route": update.get("route"),
                         "intent": update.get("intent"),
+                        "resumed": bool(update.get("resumed")),
                     }
             node_started = node_ended
     except Exception:
         await _save_error_message(cid, session)
         raise
 
+    captured = await _capture_refund_draft(final)
+    if captured is not None:
+        final["refund_draft"] = captured
+
     answer = final.get("answer") or ""
+    actions = list(final.get("actions") or [])
+
+    # 本轮没接回、旧流程还在、又答完了新话题 → park：保留旧流程并提示
+    decision = decide_flow(
+        final,
+        parked=flow if flow is not None and not slot.cancel else None,
+        resumed=bool(resume_route),
+    )
+    if decision.parked_flow:
+        answer = _with_park_notice(answer, decision.parked_flow)
+        actions.append({"type": "resume_flow", "flow": decision.parked_flow})
+    if decision.replaced_flow:
+        logger.info(
+            "流程被替换 conv=%s old=%s new=%s",
+            cid,
+            decision.replaced_flow,
+            decision.active_flow,
+        )
+
     if answer:
         yield {"delta": answer}
 
@@ -179,7 +366,6 @@ async def run_turn(
     if citations:
         yield {"event": "citations", "items": citations}
 
-    actions = final.get("actions") or []
     if actions:
         yield {"event": "actions", "items": actions}
 
@@ -193,6 +379,8 @@ async def run_turn(
             "route": final.get("route"),
             "has_answer": bool(answer),
             "citations": len(citations),
+            "parked": decision.parked_flow is not None,
+            "flow_replaced": decision.replaced_flow is not None,
         },
     )
 
@@ -211,7 +399,11 @@ async def run_turn(
                 },
                 session=s,
             )
+            # 与助手消息同事务：不能出现「消息写了、流程没写」的半截状态
+            await apply_flow_decision(cid, decision, session=s)
     except Exception:
-        logger.exception("助手消息落库失败 conv=%s", cid)
+        # 事务回滚了：不要把可能已 flush 的自增 id 发出去
+        assistant_message_id = None
+        logger.exception("助手消息/流程落库失败 conv=%s", cid)
 
     yield {"event": "done", "message_id": assistant_message_id}

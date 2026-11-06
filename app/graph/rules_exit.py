@@ -212,7 +212,13 @@ async def extract(state: ConversationState) -> dict:
 
     **合并而非覆盖**：用户可能分两轮补充（先说"质量有问题"、再说"退一件"），
     每轮只抽到一部分，覆盖会把上一轮的答案抹掉。
+
+    `skip_extract`：恢复轮用户只补了订单号（或点了选单卡），draft 已经够用，
+    不必再为一句「1001」调一次模型。
     """
+    if state.get("skip_extract"):
+        return {"refund_draft": dict(state.get("refund_draft") or {})}
+
     query = state.get("resolved_query") or state.get("raw_query") or ""
     draft = dict(state.get("refund_draft") or {})
     draft.update(await extract_draft(query))

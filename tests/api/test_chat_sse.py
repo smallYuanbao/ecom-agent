@@ -7,7 +7,9 @@
 
 **都离线**：假图不调模型，`record_span` 被替换成记录器；消息写临时库。
 """
+import asyncio
 import json
+from functools import partial
 
 import pytest
 from fastapi.testclient import TestClient
@@ -15,7 +17,8 @@ from fastapi.testclient import TestClient
 from app.api import chat as chat_module
 from app.api.chat import ChatError, run_turn
 from app.core.history import load_messages
-from app.db.repo_conversation import create_conversation
+from app.core.lock import conversation_lock as real_lock
+from app.db.repo_conversation import create_conversation, get_conversation, set_flow
 
 # ── 假图 ────────────────────────────────────────────────────
 
@@ -108,6 +111,7 @@ async def test_route_frame_carries_intent_and_route(frames):
     route = next(f for f in out if f.get("event") == "route")
     assert route["route"] == "knowledge"
     assert route["intent"] == "政策问答"
+    assert route["resumed"] is False
 
 
 async def test_route_frame_comes_before_delta(frames):
@@ -209,6 +213,306 @@ async def test_unknown_conversation_is_not_found(session, spans):
     assert exc.value.code == "not_found"
 
 
+async def test_flow_state_persisted_parked_and_cleared(session, spans):
+    cid = await create_conversation("u1", session=session)
+    pending_chunks = [
+        {"classify_intent": {"intent": "退款申请", "route": "rules"}},
+        {
+            "rules": {
+                "intent": "退款申请",
+                "pending_question": "order_id",
+                "answer": "请提供订单号",
+                "refund_draft": {"reason_code": "no_reason"},
+            }
+        },
+    ]
+
+    _ = [
+        f
+        async for f in run_turn(
+            "我要退款", cid, "t-1", graph=FakeGraph(pending_chunks), session=session
+        )
+    ]
+
+    conv = await get_conversation(cid, user_id="u1", session=session)
+    assert conv.active_flow == "refund"
+    assert conv.pending_question == "order_id"
+    assert json.loads(conv.draft)["refund"] == {"reason_code": "no_reason"}
+
+    # 下一轮完成别的话题 → park：保留旧流程 + 提示 + resume_flow 动作
+    done_chunks = [
+        {"classify_intent": {"intent": "政策问答", "route": "knowledge"}},
+        {"knowledge": {"answer": "质量问题由商家承担[1]。"}},
+    ]
+    out = [
+        f
+        async for f in run_turn(
+            "退货政策", cid, "t-1", graph=FakeGraph(done_chunks), session=session
+        )
+    ]
+
+    conv = await get_conversation(cid, user_id="u1", session=session)
+    assert conv.active_flow == "refund"
+    assert conv.pending_question == "order_id"
+    delta = next(f["delta"] for f in out if "delta" in f)
+    assert "未完成的退款申请" in delta
+    actions = next(f for f in out if f.get("event") == "actions")
+    assert {"type": "resume_flow", "flow": "refund"} in actions["items"]
+
+    # 转人工 → 清空，且不再提示 park
+    human_chunks = [
+        {"classify_intent": {"intent": "投诉", "route": "human"}},
+        {"human": {"answer": "已为您转接人工。"}},
+    ]
+    out = [
+        f
+        async for f in run_turn(
+            "我要投诉", cid, "t-1", graph=FakeGraph(human_chunks), session=session
+        )
+    ]
+
+    conv = await get_conversation(cid, user_id="u1", session=session)
+    assert conv.active_flow is None
+    assert conv.pending_question is None
+    assert not any("未完成的退款申请" in f.get("delta", "") for f in out)
+
+
+async def test_capture_refund_draft_when_order_missing(session, spans, monkeypatch):
+    """第一轮没有订单号时 C 出口不走 extract；轮末要把原因补进 draft。"""
+    cid = await create_conversation("u1", session=session)
+    chunks = [
+        {"classify_intent": {"intent": "退款申请", "route": "rules"}},
+        {
+            "rules": {
+                "intent": "退款申请",
+                "pending_question": "order_id",
+                "answer": "请提供订单号",
+            }
+        },
+    ]
+
+    async def fake_extract(text):
+        return {"reason_code": "no_reason"}
+
+    monkeypatch.setattr(chat_module, "extract_draft", fake_extract)
+
+    _ = [
+        f
+        async for f in run_turn(
+            "我要退款，尺寸不合适", cid, "t-1", graph=FakeGraph(chunks), session=session
+        )
+    ]
+
+    conv = await get_conversation(cid, user_id="u1", session=session)
+    assert json.loads(conv.draft)["refund"] == {"reason_code": "no_reason"}
+
+
+async def test_resume_refund_from_text(session, spans):
+    cid = await create_conversation("u1", session=session)
+    await set_flow(
+        cid,
+        active_flow="refund",
+        pending_question="order_id",
+        draft={
+            "intent": "退款申请",
+            "refund": {"reason_code": "no_reason"},
+            "validate_retry": 1,
+        },
+        session=session,
+    )
+    chunks = [
+        {"classify_intent": {"intent": "退款申请", "route": "rules", "resumed": True}},
+        {
+            "rules": {
+                "refund_draft": {"reason_code": "no_reason"},
+                "refund_amount": 124900,
+                "answer": "可退 1249.00 元。",
+            }
+        },
+    ]
+    fake = FakeGraph(chunks)
+
+    out = [
+        f
+        async for f in run_turn("1001", cid, "t-1", graph=fake, session=session)
+    ]
+
+    route_frame = next(f for f in out if f.get("event") == "route")
+    assert route_frame["resumed"] is True
+    assert fake.seen_state["resume_route"] == "rules"
+    assert fake.seen_state["intent"] == "退款申请"
+    assert fake.seen_state["order_id"] == "1001"
+    assert fake.seen_state["refund_draft"] == {"reason_code": "no_reason"}
+    assert fake.seen_state["validate_retry"] == 0      # 有进展，重试计数重置
+    assert fake.seen_state["skip_extract"] is True
+
+
+async def test_resume_with_extra_info_still_extracts(session, spans):
+    cid = await create_conversation("u1", session=session)
+    await set_flow(
+        cid,
+        active_flow="refund",
+        pending_question="order_id",
+        draft={"intent": "退款申请", "refund": {"reason_code": "no_reason"}},
+        session=session,
+    )
+    fake = FakeGraph(
+        [{"classify_intent": {"intent": "退款申请", "route": "rules"}}]
+    )
+
+    _ = [
+        f
+        async for f in run_turn(
+            "1001，尺寸不合适", cid, "t-1", graph=fake, session=session
+        )
+    ]
+
+    assert fake.seen_state["order_id"] == "1001"
+    assert "skip_extract" not in fake.seen_state
+
+
+async def test_resume_from_selected_action(session, spans):
+    cid = await create_conversation("u1", session=session)
+    await set_flow(
+        cid,
+        active_flow="refund",
+        pending_question="order_id",
+        draft={"intent": "退款申请", "refund": {"reason_code": "no_reason"}},
+        session=session,
+    )
+    fake = FakeGraph(
+        [{"classify_intent": {"intent": "退款申请", "route": "rules"}}]
+    )
+
+    _ = [
+        f
+        async for f in run_turn(
+            "",
+            cid,
+            "t-1",
+            selected_action={"type": "select_order", "order_id": "1001"},
+            graph=fake,
+            session=session,
+        )
+    ]
+
+    assert fake.seen_state["resume_route"] == "rules"
+    assert fake.seen_state["order_id"] == "1001"
+    assert fake.seen_state["skip_extract"] is True
+
+
+async def test_cancel_clears_flow(session, spans):
+    cid = await create_conversation("u1", session=session)
+    await set_flow(
+        cid,
+        active_flow="refund",
+        pending_question="order_id",
+        draft={"intent": "退款申请"},
+        session=session,
+    )
+    fake = FakeGraph(
+        [
+            {"classify_intent": {"intent": "政策问答", "route": "knowledge"}},
+            {"knowledge": {"answer": "质量问题由商家承担[1]。"}},
+        ]
+    )
+
+    _ = [
+        f
+        async for f in run_turn("算了", cid, "t-1", graph=fake, session=session)
+    ]
+
+    conv = await get_conversation(cid, user_id="u1", session=session)
+    assert conv.active_flow is None
+    assert fake.seen_state["resume_route"] is None
+
+
+async def test_resume_data_flow(session, spans):
+    cid = await create_conversation("u1", session=session)
+    await set_flow(
+        cid,
+        active_flow="data",
+        pending_question="order_id",
+        draft={"intent": "订单查询"},
+        session=session,
+    )
+    fake = FakeGraph(
+        [{"classify_intent": {"intent": "订单查询", "route": "data"}}]
+    )
+
+    _ = [
+        f
+        async for f in run_turn("1001", cid, "t-1", graph=fake, session=session)
+    ]
+
+    assert fake.seen_state["resume_route"] == "data"
+    assert fake.seen_state["order_id"] == "1001"
+    assert "skip_extract" not in fake.seen_state
+
+
+async def test_resume_refund_reason_skips_second_extract(
+    session, spans, monkeypatch
+):
+    cid = await create_conversation("u1", session=session)
+    await set_flow(
+        cid,
+        active_flow="refund",
+        pending_question="reason_code",
+        draft={"intent": "退款申请", "refund": {"item_count": 1}},
+        session=session,
+    )
+
+    async def fake_extract(text):
+        return {"reason_code": "quality"}
+
+    monkeypatch.setattr("app.core.slot_fill.extract_draft", fake_extract)
+
+    fake = FakeGraph(
+        [{"classify_intent": {"intent": "退款申请", "route": "rules"}}]
+    )
+    _ = [
+        f
+        async for f in run_turn(
+            "有质量问题", cid, "t-1", graph=fake, session=session
+        )
+    ]
+
+    assert fake.seen_state["refund_draft"] == {
+        "item_count": 1,
+        "reason_code": "quality",
+    }
+    assert fake.seen_state["skip_extract"] is True
+
+
+async def test_busy_conversation_raises_busy(session, spans, monkeypatch):
+    cid = await create_conversation("u1", session=session)
+    entered = asyncio.Event()
+
+    async def hold():
+        async with real_lock(cid):
+            entered.set()
+            await asyncio.sleep(0.2)
+
+    task = asyncio.create_task(hold())
+    await entered.wait()
+    monkeypatch.setattr(
+        chat_module,
+        "conversation_lock",
+        partial(real_lock, timeout=0.01),
+    )
+
+    with pytest.raises(ChatError) as exc:
+        _ = [
+            f
+            async for f in run_turn(
+                "你好", cid, "t-1", graph=FakeGraph([]), session=session
+            )
+        ]
+
+    assert exc.value.code == "busy"
+    await task
+
+
 async def test_graph_error_persists_error_message(session, spans):
     cid = await create_conversation("u1", session=session)
     with pytest.raises(RuntimeError):
@@ -285,6 +589,10 @@ async def test_state_passed_to_graph(session, spans):
         "conversation_id": cid,
         "trace_id": "t-9",
         "user_id": "u1",       # 演示身份，Ch06 换成真实登录用户
+        "history": [],         # 新会话没有历史
+        "summary": None,
+        "resume_route": None,
+        "resumed": False,
     }
     assert fake.seen_mode == "updates"
 
