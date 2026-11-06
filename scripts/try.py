@@ -126,7 +126,10 @@ async def run_chat(first: str | None = None) -> None:
         try:
             async for frame in run_turn(text, cid, trace_id):
                 event = frame.get("event")
-                if event == "ack":
+                # delta 帧没有 event 字段
+                if "delta" in frame:
+                    print(f"  答: {frame['delta']}")
+                elif event == "ack":
                     cid = frame.get("conversation_id")
                     print(
                         f"  conversation_id={cid} "
@@ -134,8 +137,6 @@ async def run_chat(first: str | None = None) -> None:
                     )
                 elif event == "route":
                     print(f"  route={frame.get('route')} intent={frame.get('intent')}")
-                elif event == "delta":
-                    print(f"  答: {frame.get('delta')}")
                 elif event == "citations":
                     print(f"  citations={frame.get('items')}")
                 elif event == "actions":
