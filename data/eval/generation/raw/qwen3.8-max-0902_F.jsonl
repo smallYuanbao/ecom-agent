@@ -1,0 +1,10 @@
+{"query": "订单1105我看签收时间居然比发货时间还早，这是怎么回事？", "style": "colloquial", "scenario": "签收时间早于发货时间", "model": "qwen3.8-max-0902"}
+{"query": "你好，订单1105显示签收时间早于发货时间，请帮我核实一下。", "style": "formal", "scenario": "签收时间早于发货时间", "model": "qwen3.8-max-0902"}
+{"query": "订单1004明明有快递单号，但物流那边一直查不到记录。", "style": "colloquial", "scenario": "有快递单号但无物流记录", "model": "qwen3.8-max-0902"}
+{"query": "请帮我查一下订单1004，页面显示有快递单号，但没有任何物流信息。", "style": "formal", "scenario": "有快递单号但无物流记录", "model": "qwen3.8-max-0902"}
+{"query": "订单1003怎么一直没有物流单号啊？", "style": "colloquial", "scenario": "订单缺少物流单号", "model": "qwen3.8-max-0902"}
+{"query": "我查看订单1003时发现没有物流单号，麻烦确认一下。", "style": "formal", "scenario": "订单缺少物流单号", "model": "qwen3.8-max-0902"}
+{"query": "我输入订单9999查不到，你们那边能看到这个订单吗？", "style": "colloquial", "scenario": "订单不存在查询异常", "model": "qwen3.8-max-0902"}
+{"query": "订单9999查询不到任何信息，请核实是否存在该订单。", "style": "formal", "scenario": "订单不存在查询异常", "model": "qwen3.8-max-0902"}
+{"query": "订单1101我还没收到货。状态却显示已签收，麻烦你们看下。", "style": "multi", "scenario": "签收状态与用户描述不一致", "model": "qwen3.8-max-0902"}
+{"query": "订单1002我这边已经签收了。可页面还是已发货未签收，麻烦核实。", "style": "multi", "scenario": "签收状态与用户描述不一致", "model": "qwen3.8-max-0902"}

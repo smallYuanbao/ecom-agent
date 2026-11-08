@@ -1,0 +1,20 @@
+{"query": "请问七日无理由退货的期限是从哪一天开始计算的？", "style": "formal", "scenario": "七日无理由起算时间", "model": "glm-5.3"}
+{"query": "奶瓶拆封了还能不能退？", "style": "colloquial", "scenario": "入口喂养用品拆封退货", "model": "glm-5.3"}
+{"query": "推车收到超过七天才发现有质量问题，还能申请退货吗？运费该谁出？", "style": "multi", "scenario": "质量问题超七天退货", "model": "glm-5.3"}
+{"query": "按照消费者权益保护法，哪些商品不适用七日无理由退货？", "style": "formal", "scenario": "消法无理由退货例外", "model": "glm-5.3"}
+{"query": "定制的推车是不是法规上就不能无理由退？那拆封的奶瓶呢？", "style": "multi", "scenario": "定制与拆封商品退货法规", "model": "glm-5.3"}
+{"query": "无理由退货时，退货运费由哪一方承担？", "style": "formal", "scenario": "无理由退货运费承担", "model": "glm-5.3"}
+{"query": "退货运费到底是你们出还是我自己出啊？", "style": "colloquial", "scenario": "退货运费归属", "model": "glm-5.3"}
+{"query": "请问退货时对商品完好是如何界定的？", "style": "formal", "scenario": "商品完好界定标准", "model": "glm-5.3"}
+{"query": "东西拆开包装看了一眼，没用过，这样算商品完好能退不？", "style": "colloquial", "scenario": "拆封未用能否退货", "model": "glm-5.3"}
+{"query": "你们家满多少钱包邮呀？", "style": "colloquial", "scenario": "包邮门槛金额", "model": "glm-5.3"}
+{"query": "一单里同时买了辅食机和推车两样东西，是按整单总价算包邮吗？", "style": "multi", "scenario": "多件凑单包邮", "model": "glm-5.3"}
+{"query": "运费险一单最多能赔多少钱？", "style": "colloquial", "scenario": "运费险赔付上限", "model": "glm-5.3"}
+{"query": "要是退货运费超过了运费险赔付上限，多出来的部分谁承担？质量问题退货也是这样算吗？", "style": "multi", "scenario": "运费险超额与质量运费", "model": "glm-5.3"}
+{"query": "发票在订单完成后多长时间内可以开具？", "style": "formal", "scenario": "发票开具时限", "model": "glm-5.3"}
+{"query": "之前完成的订单现在还能补开发票不？", "style": "colloquial", "scenario": "补开发票", "model": "glm-5.3"}
+{"query": "银卡会员和金卡会员分别享受几折优惠？", "style": "formal", "scenario": "会员等级折扣", "model": "glm-5.3"}
+{"query": "用优惠券下单还能叠加金卡会员折扣吗？这样凑够包邮门槛的话运费怎么算？", "style": "multi", "scenario": "优惠券与会员折扣叠加", "model": "glm-5.3"}
+{"query": "我手里有两张优惠券，下单的时候能一起用不？", "style": "colloquial", "scenario": "优惠券叠加规则", "model": "glm-5.3"}
+{"query": "ST-20 和 ST-60 这两款婴儿推车有什么区别？", "style": "formal", "scenario": "推车款式对比", "model": "glm-5.3"}
+{"query": "我家宝宝九公斤，CS-04 和 CS-12 哪个安全座椅合适？CS-04 售罄了还会补货吗？", "style": "multi", "scenario": "安全座椅适配与补货", "model": "glm-5.3"}

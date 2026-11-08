@@ -1,0 +1,68 @@
+# 从 eval_v1 移出的 dev 样本
+#
+# 这些条目在本地 run-local-01/02/03 中参与过 judge prompt / 规则修复，
+# 不能再作为盲测 test。保留在这里用于 dev 回归，不进入 44 条正式评测集。
+version: v1
+items:
+  - id: B01
+    bucket: B4
+    query: "订单1103 商品完好，不想要了，我要退款"
+    expect_route: rules
+    expect_refund: {eligible: false, amount: 0, reason_code: "not_applicable"}
+    expect_answer_contains: ["不适用|不符合|无法|不能|不支持|没法"]
+    expected_output: "不适用|不符合退款条件"
+    style: formal
+    split: dev
+    notes: "参与过类别规则 prompt 修复"
+
+  - id: B02
+    bucket: B4
+    query: "订单1104 奶瓶已经拆封了，不想要了"
+    expect_route: rules
+    expect_refund: {eligible: false, amount: 0, reason_code: "not_applicable"}
+    expect_answer_contains: ["不适用|不符合|无法|不能|不支持|没法"]
+    expected_output: "不适用|不符合退款条件"
+    style: formal
+    split: dev
+
+  - id: B03
+    bucket: B4
+    query: "订单1106 商品完好，不想要了，我要退款"
+    expect_route: rules
+    expect_refund: {eligible: false, amount: 0, reason_code: "out_of_window"}
+    expect_answer_contains: ["不符合|无法|不能|不支持|超出|超过", "7 天|七天|超"]
+    expected_output: "不符合退款条件"
+    style: formal
+    split: dev
+    notes: "参与过 7 天窗口 prompt 修复"
+
+  - id: B05
+    bucket: B4
+    query: "订单1108 我不想要了，拒收退款"
+    expect_route: rules
+    expect_refund: {eligible: true, amount: 289900, reason_code: "reject_then_refund"}
+    expect_answer_contains: ["拒收", "2899.00 元"]
+    expected_output: "拒收/2899.00 元"
+    style: formal
+    split: dev
+    notes: "参与过 _red_line 修复"
+
+  - id: B06
+    bucket: B4
+    query: "订单1101 退5件，商品完好，不想要了"
+    expect_route: rules
+    expect_refund: {eligible: true, amount: 129900}
+    expect_answer_contains: ["1299.00 元"]
+    expected_output: "1299.00 元"
+    style: formal
+    split: dev
+
+  - id: T04
+    bucket: B7
+    query: "订单2001 不想要了，我要退款"
+    expect_route: rules
+    expect_answer_contains: ["没有找到这笔订单"]
+    expected_output: "没有找到这笔订单"
+    style: formal
+    split: dev
+    notes: "参与过 rules_exit.need_info 修复"

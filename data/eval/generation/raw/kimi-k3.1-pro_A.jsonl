@@ -1,0 +1,20 @@
+{"query": "请问七日无理由退货的期限如何计算，是从签收当日还是签收次日起算？", "style": "formal", "scenario": "七日无理由起算时间", "model": "kimi-k3.1-pro"}
+{"query": "推车签收都一个多礼拜了，才发现有质量问题，这种还能退不？", "style": "colloquial", "scenario": "超期质量问题退货", "model": "kimi-k3.1-pro"}
+{"query": "想确认一下，定做的婴儿推车和已经拆封的奶瓶，是不是都不在七日无理由退货范围内？如果拆封之后才发现有质量问题，又该怎么处理？", "style": "multi", "scenario": "定制与拆封商品退货限制", "model": "kimi-k3.1-pro"}
+{"query": "因商品质量问题办理退货时，退货运费由哪一方承担？", "style": "formal", "scenario": "质量问题退货运费承担", "model": "kimi-k3.1-pro"}
+{"query": "我就是单纯不想要了，退货的话快递费是不是得我自己掏啊？", "style": "colloquial", "scenario": "无理由退货运费承担", "model": "kimi-k3.1-pro"}
+{"query": "如果我自己承担运费走无理由退货，运费险能赔多少、够不够覆盖实际快递费？要是质量问题退货，商家承担运费的话，运费险还会不会重复赔？", "style": "multi", "scenario": "运费险赔付与运费承担", "model": "kimi-k3.1-pro"}
+{"query": "申请七日无理由退货时，对商品完好有哪些具体要求，吊牌、外包装和配件需要保持什么状态？", "style": "formal", "scenario": "退货商品完好标准", "model": "kimi-k3.1-pro"}
+{"query": "推车就在家里拆开推了两下，没推出门用过，这样算不算影响二次销售，还能走七天无理由吗？", "style": "colloquial", "scenario": "拆封试用是否算商品完好", "model": "kimi-k3.1-pro"}
+{"query": "你们家现在买多少钱包邮啊？就买个奶瓶这种小件，够不够免运费？", "style": "colloquial", "scenario": "包邮门槛咨询", "model": "kimi-k3.1-pro"}
+{"query": "如果我凑单买了推车和辅食机，又用优惠券和会员折扣把实付拉低了，包邮是看优惠前的商品金额，还是看最后实付金额？", "style": "multi", "scenario": "优惠后包邮判定口径", "model": "kimi-k3.1-pro"}
+{"query": "发票应在订单完成后的多长时间内申请开具，超过该期限是否还能补开？", "style": "formal", "scenario": "发票开具与补开时限", "model": "kimi-k3.1-pro"}
+{"query": "东西确认收货之后多久之内还能开发票呀？先开了个人抬头，后面想换成公司抬头的行不行？", "style": "colloquial", "scenario": "发票期限与抬头变更", "model": "kimi-k3.1-pro"}
+{"query": "请问银卡会员与金卡会员分别享受什么折扣，会员折扣是否适用于全部在售商品？", "style": "formal", "scenario": "会员等级折扣规则", "model": "kimi-k3.1-pro"}
+{"query": "会员打折和优惠券能不能一起用啊，还是只能选一个？", "style": "colloquial", "scenario": "会员折扣与优惠券同享", "model": "kimi-k3.1-pro"}
+{"query": "手里有两张优惠券，结算的时候能不能叠加使用？如果不能叠加，是不是可以选一张优惠力度更大的，再和会员折扣一起算？", "style": "multi", "scenario": "优惠券叠加与选用规则", "model": "kimi-k3.1-pro"}
+{"query": "CS-04 与 CS-12 两款安全座椅分别适用的体重范围是多少，颜色和库存情况有何区别？", "style": "formal", "scenario": "安全座椅规格对比", "model": "kimi-k3.1-pro"}
+{"query": "ST-20 和那个高景观的 ST-60 到底差在哪儿啊，平时带娃出门想轻便点，该看哪款？", "style": "colloquial", "scenario": "婴儿推车款式区别", "model": "kimi-k3.1-pro"}
+{"query": "想买辅食机，基础款和蒸煮一体那款在功能上差什么？薄荷绿那款现在显示预售，是没有现货吗，奶油白的基础款能不能直接拍？", "style": "multi", "scenario": "辅食机功能与预售库存", "model": "kimi-k3.1-pro"}
+{"query": "七日无理由退货以及定作商品不适用该规则，在《消费者权益保护法》中分别对应哪些规定？", "style": "formal", "scenario": "无理由退货法规依据", "model": "kimi-k3.1-pro"}
+{"query": "想了解一下，法律上对商品质量问题的退换货有没有不受七天限制的规定？如果婴儿推车用了半个多月出现质量问题，我主张退货并要求商家承担运费，依据是什么？", "style": "multi", "scenario": "质量问题退换法规依据", "model": "kimi-k3.1-pro"}
