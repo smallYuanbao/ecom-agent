@@ -14,6 +14,7 @@
 | [ch04-data-exit-changes.md](./ch04-data-exit-changes.md) | B 出口：订单 / 物流 / 库存查询 |
 | [ch05-multi-turn-changes.md](./ch05-multi-turn-changes.md) | 多轮：消息落库、锚点、窗口、指代、park、ReAct |
 | [ch06-security-changes.md](./ch06-security-changes.md) | 安全：越权、404、Prompt 四区、输出检查、日志 |
+| [ch07-eval-changes.md](./ch07-eval-changes.md) | 评测：44 条评测集、评测门面、EvalFlow 接入、阈值与传导 |
 
 ## 二、验收报告（一章做完时写）
 
