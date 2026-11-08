@@ -7,6 +7,7 @@
 避免"prompt 里有 12 类、代码里只有 11 类"这种漂移。
 """
 import json
+from datetime import UTC, datetime
 from typing import Any
 
 from app.graph.routing import DEFAULT_INTENT, INTENTS
@@ -210,11 +211,23 @@ JUDGE_SYSTEM = """## 角色
 9. 无理由且自签收次日起超过 7 天 → 不可退，`out_of_window`；**质量问题不受 7 天限制**
 10. 以上都不命中 → 可退，`ok`
 
+## 三个最容易错的顺序（按例子判，不要跳步）
+
+- **已签收超过 7 天 + `reason_code=no_reason`**：即使商品完好，也判
+  `eligible=false, reason_code=out_of_window`。
+  「完好」只影响规则 8 的 `not_intact`，**不能抵消 7 天窗口**。
+- **状态 = 已发货且未签收**：先命中规则 5，判
+  `eligible=true, reason_code=reject_then_refund`。
+  即使商品类别是定作 / 定制，也**不要跳到规则 6**；状态规则优先于类别规则。
+- **商品类别是定作 / 定制**：即使已签收、商品完好、还在 7 天内，也判
+  `eligible=false, reason_code=not_applicable`。类别规则先于窗口和完好规则。
+
 ## 政策原文优先
 `<policy>` 里是平台政策原文。规则与政策**冲突时以政策原文为准**，
 并在 `cited_article` 写明依据。政策没有覆盖的情形，**不要自己发明规则**。
 
 ## 你还会收到
+- `<now>`：当前时间。**7 天窗口用它算，不要用你的训练时间**
 - `<order>`：订单快照（状态、金额、件数、商品类别、各环节时间）
 - `<request>`：用户这次退款申请的要素（原因、件数、是否完好、是否拆封）
 - `<user_input>`：用户原话
@@ -287,9 +300,17 @@ def judge_messages(
     order: dict,
     request: dict,
     evidence: list[dict],
+    *,
+    now: datetime | None = None,
 ) -> list[dict[str, str]]:
-    """判定用的消息列表。四块材料都放在标签里，便于注入防御与调试。"""
+    """判定用的消息列表。四块材料都放在标签里，便于注入防御与调试。
+
+    `<now>` 必须给：没有当前时间，模型无法计算 7 天窗口，
+    只能靠训练时间猜——实测把「签收 1 天」判成了 `out_of_window`。
+    """
+    now = now or datetime.now(UTC).replace(tzinfo=None)
     user = (
+        f"<now>{now.isoformat(timespec='seconds')}</now>\n"
         f"<order>{json.dumps(order, ensure_ascii=False)}</order>\n"
         f"<request>{json.dumps(request, ensure_ascii=False)}</request>\n"
         f"<policy>\n{_policy_block(evidence)}\n</policy>\n"

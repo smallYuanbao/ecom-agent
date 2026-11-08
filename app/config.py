@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     prompt_version: str = "v1"
     kb_version: str = ""          # 运行时由知识库内容哈希填充
 
+    # Ch07：评测专用门面 `/api/eval/chat`。默认关闭，只在本机评测实例打开。
+    enable_eval_api: bool = False
+
     # 观测（可选）
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""

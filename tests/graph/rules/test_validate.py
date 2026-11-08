@@ -183,6 +183,7 @@ async def test_need_info_re_asks_order_when_not_found(monkeypatch):
     )
     assert result["pending_question"] == "order_id"
     assert result["validate_retry"] == 1
+    assert "没有找到这笔订单" in result["answer"]
 
 
 async def test_need_info_asks_reason_when_missing():

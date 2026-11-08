@@ -503,6 +503,10 @@ def _red_line(
         return "amount_exceeds_paid"
     if amount <= 0:
         return "amount_not_positive"
+    # 规则 5（已发货未签收 → 拒收退款）先于规则 6（类别不适用）：
+    # 未签收的定制商品仍按拒收全退，不能在这里被类别红线否掉。
+    if judgement.get("reason_code") == "reject_then_refund":
+        return None
     if _category_matches(order.category, NOT_APPLICABLE_KEYWORDS):
         return "not_applicable_bypass"
     if _category_matches(order.category, SEVENTH_ARTICLE_KEYWORDS) and order.packaging_opened:
@@ -600,7 +604,12 @@ async def need_info(state: ConversationState) -> dict:
     retry = (state.get("validate_retry") or 0) + 1
 
     if not state.get("order_id") or errors & {"missing_order_id", "order_not_found"}:
-        return {**await ask_order(state), "validate_retry": retry}
+        return {
+            # 用户报了一个查不到的号时，话术要先说「没找到」，
+            # 不能只列候选——否则用户以为自己没说清楚。
+            **await ask_order(state, not_found="order_not_found" in errors),
+            "validate_retry": retry,
+        }
     if not draft.get("reason_code") or "missing_reason_code" in errors:
         return {**_ask_reason(), "validate_retry": retry}
     return {}

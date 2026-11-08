@@ -163,11 +163,14 @@ async def run_turn(
     selected_action: dict | None = None,
     graph: Any | None = None,
     session: AsyncSession | None = None,
+    capture: dict | None = None,
 ) -> AsyncIterator[dict]:
     """跑一轮对话，逐个产出 SSE 帧（dict）。
 
     `graph` 可注入，测试用假图替换；生产走 `build_graph()`。
     `session` 可注入，测试指向临时库；生产不传，走模块级 engine。
+    `capture` 只给评测入口用：图跑完后把终态、guard 后的回答和动作放进去，
+    避免为了评测复制一套 `run_turn`。
     """
     text = (message or "").strip()
     # 结构化点选（选单/选规格）可以没有文字内容
@@ -197,6 +200,7 @@ async def run_turn(
                 trace_id=trace_id,
                 graph=graph,
                 session=session,
+                capture=capture,
             ):
                 yield frame
     except BusyError as exc:
@@ -214,6 +218,7 @@ async def _run_turn_locked(
     trace_id: str,
     graph: Any | None,
     session: AsyncSession | None,
+    capture: dict | None = None,
 ) -> AsyncIterator[dict]:
     """锁内的一轮：读会话与流程、槽位填充、跑图、写库。"""
     # 锁内再读会话：并发请求在等锁期间，上一轮可能已经改了 summary / 流程
@@ -387,6 +392,12 @@ async def _run_turn_locked(
             decision.replaced_flow,
             decision.active_flow,
         )
+
+    if capture is not None:
+        capture["final"] = final
+        capture["answer"] = answer
+        capture["actions"] = list(actions)
+        capture["violations"] = list(guarded.violations)
 
     if answer:
         yield {"delta": answer}

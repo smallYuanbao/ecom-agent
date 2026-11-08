@@ -129,6 +129,21 @@ async def test_red_line_not_applicable_category():
     assert result["compliance_violation"] == "not_applicable_bypass"
 
 
+async def test_reject_then_refund_skips_category_red_line():
+    """规则 5 在规则 6 之前：已发货未签收的定制商品按拒收全退。"""
+    result = await compliance(
+        state(
+            order_snapshot=snapshot(
+                status="已发货",
+                signed_at=None,
+                category="定制婴儿推车",
+            ),
+            refund_judgement=judgement(reason_code="reject_then_refund"),
+        )
+    )
+    assert not result.get("compliance_violation")
+
+
 async def test_red_line_opened_bottle():
     result = await compliance(
         state(

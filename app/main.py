@@ -16,6 +16,7 @@ from openai import APITimeoutError
 from pydantic import BaseModel, Field
 
 from app.api.chat import ChatError, conversation_access, run_turn
+from app.api.eval import router as eval_router
 from app.config import get_settings, validate_or_die
 from app.core.kb_version import cached_kb_version
 from app.core.logging import new_trace_id, setup_logging, trace_id_var
@@ -31,6 +32,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="ecom-agent", version="0.1.0", lifespan=lifespan)
+app.include_router(eval_router)
 
 
 @app.middleware("http")

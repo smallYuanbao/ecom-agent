@@ -147,6 +147,7 @@ async def test_messages_include_all_four_inputs(monkeypatch):
     await judge(state())
 
     user = calls[0][-1]["content"]
+    assert "<now>" in user
     assert "<order>" in user and "婴儿推车" in user
     assert "<request>" in user and "no_reason" in user
     assert "<policy>" in user and "自签收次日起 7 日内" in user
@@ -201,6 +202,14 @@ def test_prompt_forbids_not_intact_when_condition_unknown():
     """
     assert "`condition_ok` 为 `null` 时**不得判 `not_intact`**" in JUDGE_SYSTEM
     assert "低" in JUDGE_SYSTEM and "confidence" in JUDGE_SYSTEM
+
+
+def test_prompt_pins_window_and_status_order():
+    """run-local-02 的三条失败：模型把「完好」当成 7 天窗口的豁免，
+    并把「已发货」的定制商品跳到类别规则。用例子把顺序写死。"""
+    assert "不能抵消 7 天窗口" in JUDGE_SYSTEM
+    assert "状态规则优先于类别规则" in JUDGE_SYSTEM
+    assert "类别规则先于窗口和完好规则" in JUDGE_SYSTEM
 
 
 # ── 条件边 ──────────────────────────────────────────────────
