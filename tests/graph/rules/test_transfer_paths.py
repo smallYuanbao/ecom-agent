@@ -78,6 +78,10 @@ def patch_env(
     monkeypatch.setattr(rules_exit, "search", _search)
     monkeypatch.setattr(rules_exit, "structured_call", _structured)
     monkeypatch.setattr(rules_exit, "record_span", _span)
+    # 固定时钟：否则测试会随真实日期漂移（签收 7 天窗口）。
+    monkeypatch.setattr(
+        rules_exit, "utcnow", lambda: CREATED + timedelta(days=4)
+    )
 
 
 async def run(query: str = "订单1002 不想要了", **state) -> dict:
