@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     # 已知漏洞：域外问题「能分期付款吗」0.572 会越过——单阈值分不干净，见 app/core/gate.py
     evidence_threshold: float = 0.55
 
+    # Ch07 语义证据闸：只对 [threshold, threshold+band) 的边界样本调一次 LLM 自评。
+    # 超时必须短且不重试：它是用户等待路径上的一步，不能吃掉 C5 的 30s 总预算。
+    evidence_semantic_enabled: bool = True
+    evidence_semantic_band: float = 0.05
+    evidence_judge_timeout: float = 3.0
+
     # 检索策略：dense / bm25 / hybrid。默认值由 Task 5 的实验决定，
     # 见 docs/reports/retrieval-eval.md
     retrieval_strategy: str = "dense"

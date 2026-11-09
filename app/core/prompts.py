@@ -479,3 +479,69 @@ def coref_messages(
         {"role": "system", "content": COREF_SYSTEM + PROMPT_GUARD},
         {"role": "user", "content": "\n\n".join(lines)},
     ]
+
+# ── 证据自评（Ch07 语义闸）─────────────────────────────────
+
+EVIDENCE_JUDGE_TOOL_NAME = "judge_evidence"
+
+EVIDENCE_JUDGE_SYSTEM = """## 角色
+你是证据充分性判定器。只判断 <evidence> 是否足以回答 <user_input>，不回答问题。
+
+## 判定标准
+- 证据里有回答所需的具体事实、条款或数字 → `sufficient=true`
+- 只是话题相近、没有针对问题的具体答案 → `sufficient=false`
+- 证据只覆盖一部分且缺关键结论 → `sufficient=false`
+- 证据之间冲突、或无法判断 → `sufficient=false`
+- 拿不准时一律判 `false`（fail-closed：宁可转人工，不拿不相关依据硬答）
+
+## 你还会收到
+- `<user_input>`：用户问题
+- `<evidence>`：检索到的证据，每条带编号、来源和正文
+
+## 输出
+只通过工具返回，不要用自然语言解释。
+"""
+
+EVIDENCE_JUDGE_PARAMETERS: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "sufficient": {
+            "type": "boolean",
+            "description": "这些证据是否足以回答用户问题",
+        },
+        "confidence": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "description": "对这个判断的确定度",
+        },
+        "reason": {
+            "type": "string",
+            "description": "一句话说明：证据里的哪个事实支持/不支持回答",
+        },
+    },
+    "required": ["sufficient", "confidence", "reason"],
+}
+
+
+def evidence_judge_messages(
+    query: str, hits: list[dict], *, max_chars_per_hit: int = 500
+) -> list[dict[str, str]]:
+    """证据自评的消息列表：用户问题 + 带编号的证据正文。"""
+    lines: list[str] = []
+    for index, hit in enumerate(hits, start=1):
+        source = hit.get("source") or ""
+        section = hit.get("section") or ""
+        text = str(hit.get("text") or "")[:max_chars_per_hit]
+        lines.append(f"[{index}]（{source} / {section}）{text}")
+    evidence = "\n".join(lines) or "（没有证据）"
+    return [
+        {"role": "system", "content": EVIDENCE_JUDGE_SYSTEM + PROMPT_GUARD},
+        {
+            "role": "user",
+            "content": (
+                f"<user_input>{query}</user_input>\n"
+                f"<evidence>\n{evidence}\n</evidence>"
+            ),
+        },
+    ]

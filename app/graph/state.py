@@ -25,6 +25,8 @@ class ConversationState(TypedDict, total=False):
     intent_confidence: float      # 0–1；只做标记（<0.5 打 low_conf），不改路由
     route: str                    # 5 出口之一：knowledge/data/rules/human/fallback
     evidence: list[dict]          # 命中 chunk 原文 [{id,text,source,similarity}]；本章存全量
+    evidence_strong: bool         # 最终闸结论（机械 + 语义自评）
+    evidence_judge: dict          # 语义自评结果 {decision, sufficient, confidence, reason}
     citation_ids: list[str]       # 最终引用了哪些 chunk，如 ["第六条","returns#退款时效"]
 
     # ── C 出口：退款流水线（Ch03）────────────────────────────────

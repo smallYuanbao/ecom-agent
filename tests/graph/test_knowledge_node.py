@@ -119,6 +119,60 @@ async def test_weak_evidence_goes_to_fallback_and_records(monkeypatch):
     assert recorded["reason"] == "retrieval_low_conf"
 
 
+async def test_borderline_semantic_pass_generates(monkeypatch):
+    async def fake_judge(query, hits):
+        return {"sufficient": True, "confidence": 0.9, "reason": "证据有答案"}
+
+    monkeypatch.setattr(
+        knowledge.evidence_judge, "judge_evidence", fake_judge
+    )
+    borderline = [{**EVIDENCE[0], "similarity": 0.57}]
+    result, recorded = await _invoke_with(monkeypatch, evidence=borderline)
+
+    assert result["answer"] == "基于证据的回答[1]"
+    assert result["evidence_strong"] is True
+    assert result["evidence_judge"]["decision"] == "semantic"
+    assert recorded == {}
+
+
+async def test_borderline_semantic_reject_goes_to_fallback(monkeypatch):
+    async def fake_judge(query, hits):
+        return {"sufficient": False, "confidence": 0.8, "reason": "只是话题相近"}
+
+    monkeypatch.setattr(
+        knowledge.evidence_judge, "judge_evidence", fake_judge
+    )
+    borderline = [{**EVIDENCE[0], "similarity": 0.57}]
+    result, recorded = await _invoke_with(monkeypatch, evidence=borderline)
+
+    assert "没有找到确切的依据" in result["answer"]
+    assert result["evidence_strong"] is False
+    assert recorded["reason"] == "retrieval_low_conf_semantic"
+
+
+async def test_semantic_error_fails_closed(monkeypatch):
+    async def boom(query, hits):
+        raise TimeoutError("3s 超时")
+
+    monkeypatch.setattr(knowledge.evidence_judge, "judge_evidence", boom)
+    borderline = [{**EVIDENCE[0], "similarity": 0.57}]
+    result, recorded = await _invoke_with(monkeypatch, evidence=borderline)
+
+    assert "没有找到确切的依据" in result["answer"]
+    assert result["evidence_strong"] is False
+    assert recorded["reason"] == "retrieval_low_conf_semantic_error"
+
+
+async def test_strong_evidence_does_not_call_semantic_judge(monkeypatch):
+    async def boom(query, hits):
+        raise AssertionError("强证据不该调语义 judge")
+
+    monkeypatch.setattr(knowledge.evidence_judge, "judge_evidence", boom)
+    result, _ = await _invoke_with(monkeypatch, evidence=EVIDENCE)
+
+    assert result["answer"] == "基于证据的回答[1]"
+
+
 async def test_zero_hits_goes_to_fallback_without_candidate_title(monkeypatch):
     """零召回时不能反问「您是不是想问 X」——没有 X。"""
     result, recorded = await _invoke_with(monkeypatch, evidence=[])

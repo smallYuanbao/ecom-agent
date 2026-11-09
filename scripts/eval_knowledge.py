@@ -74,7 +74,7 @@ async def main() -> int:
                 "query": query,
                 "evidence": evidence,
                 "answer": answer,
-                "gated": is_strong(evidence),
+                "gated": state.get("evidence_strong", is_strong(evidence)),
                 "hit": _hit(evidence, query.expect_ids),
                 "points_got": got,
                 "points_total": total,

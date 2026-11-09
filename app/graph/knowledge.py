@@ -15,18 +15,21 @@ retrieve ──► gate ──┬─ strong ──► generate
    解析不到就给空列表，**不能让引用失败导致整轮失败**。
 3. **弱证据不等于不回答**：走兜底话术，同时落池——那是飞轮的入口（K5）。
 """
+import logging
 import re
 from typing import Any
 
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from app.core import llm
+from app.core import evidence_judge, llm
 from app.core.fallback import fallback_text, record_low_conf
-from app.core.gate import is_strong
+from app.core.gate import gate_decision, is_strong
 from app.core.prompts import kb_answer_messages
 from app.core.retrieval import search
 from app.graph.state import ConversationState
+
+logger = logging.getLogger(__name__)
 
 TOP_K = 5
 TOPIC_MAX_CHARS = 30
@@ -70,6 +73,47 @@ async def retrieve(state: ConversationState) -> dict:
     return {"evidence": hits}
 
 
+async def judge_evidence(state: ConversationState) -> dict:
+    """三态闸：机械强/弱直接判，边界带才调一次证据自评。
+
+    **fail-closed**：自评超时、格式错、异常都判 weak，走兜底话术 + 落池。
+    超时由 `evidence_judge_timeout` 控制（3s），不重试。
+    """
+    hits = state.get("evidence") or []
+    decision = gate_decision(hits)
+
+    if decision == "strong":
+        return {
+            "evidence_strong": True,
+            "evidence_judge": {"decision": "mechanical_strong"},
+        }
+    if decision == "weak":
+        return {
+            "evidence_strong": False,
+            "evidence_judge": {"decision": "mechanical_weak"},
+        }
+
+    query = state.get("resolved_query") or state.get("raw_query", "")
+    try:
+        verdict = await evidence_judge.judge_evidence(query, hits)
+    except Exception as exc:                       # noqa: BLE001
+        logger.warning("证据自评失败，按弱证据处理: %s", exc)
+        return {
+            "evidence_strong": False,
+            "evidence_judge": {
+                "decision": "semantic_error",
+                "sufficient": False,
+                "confidence": 0.0,
+                "reason": type(exc).__name__,
+            },
+        }
+
+    return {
+        "evidence_strong": bool(verdict.get("sufficient")),
+        "evidence_judge": {"decision": "semantic", **verdict},
+    }
+
+
 async def generate(state: ConversationState) -> dict:
     """基于证据生成回答，并解析引用。"""
     query = state.get("resolved_query") or state.get("raw_query", "")
@@ -94,9 +138,18 @@ async def weak_fallback(state: ConversationState) -> dict:
     top1_title = evidence[0].get("section") if evidence else None
 
     text, _next_step = fallback_text(_topic(state), top1_title)
+    judge = state.get("evidence_judge") or {}
+    decision = str(judge.get("decision") or "")
+    # 机械弱保持旧 reason，避免改变既有落池口径；
+    # 只有语义闸判弱/失败时才加后缀，方便飞轮区分「无答案」与「闸故障」。
+    reason = (
+        f"retrieval_low_conf_{decision}"
+        if decision.startswith("semantic")
+        else "retrieval_low_conf"
+    )
     await record_low_conf(
         question=query,
-        reason="retrieval_low_conf",
+        reason=reason,
         hits=evidence,
         conversation_id=state.get("conversation_id"),
     )
@@ -112,22 +165,29 @@ async def weak_fallback(state: ConversationState) -> dict:
 
 
 def _gate_edge(state: ConversationState) -> str:
-    """证据闸的条件边。只返回键，不写 state。"""
-    return "strong" if is_strong(state.get("evidence") or []) else "weak"
+    """证据闸的条件边。只返回键，不写 state。
+
+    优先读 `judge_evidence` 写好的三态结论；旧调用/直接构造 state 的测试
+    没有这个字段时回退到机械闸。
+    """
+    strong = state.get("evidence_strong")
+    if strong is None:
+        strong = is_strong(state.get("evidence") or [])
+    return "strong" if strong else "weak"
 
 
 def build_knowledge_graph() -> CompiledStateGraph:
     """编译知识出口子图。主图把它挂在 `knowledge` 节点上（节点名不变）。"""
     graph: Any = StateGraph(ConversationState)
     graph.add_node("retrieve", retrieve)
+    graph.add_node("judge_evidence", judge_evidence)
     graph.add_node("generate", generate)
     graph.add_node("weak_fallback", weak_fallback)
 
-    # 设置起始节点
-    # 也可能是这样 graph.add_edge(START, "retrieve")
-    graph.set_entry_point("retrieve") # 设置起始节点
+    graph.set_entry_point("retrieve")
+    graph.add_edge("retrieve", "judge_evidence")
     graph.add_conditional_edges(
-        "retrieve", _gate_edge, {"strong": "generate", "weak": "weak_fallback"}
+        "judge_evidence", _gate_edge, {"strong": "generate", "weak": "weak_fallback"}
     )
     graph.add_edge("generate", END)
     graph.add_edge("weak_fallback", END)

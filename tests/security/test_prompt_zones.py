@@ -4,6 +4,7 @@ from app.core.history import save_user_message
 from app.core.llm import ToolChatReply
 from app.core.prompts import (
     coref_messages,
+    evidence_judge_messages,
     extract_messages,
     intent_messages,
     judge_messages,
@@ -24,6 +25,10 @@ def test_all_system_prompts_have_guard():
             [{"id": "a", "source": "s", "section": "sec", "text": "t"}],
         ),
         coref_messages("那单呢", [{"role": "user", "content": "订单1001 到哪了"}]),
+        evidence_judge_messages(
+            "能分期付款吗",
+            [{"id": "a", "source": "s", "section": "sec", "text": "t"}],
+        ),
     ]
 
     for messages in batches:

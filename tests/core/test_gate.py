@@ -10,7 +10,7 @@ from sqlalchemy import select
 
 from app.config import get_settings
 from app.core.fallback import fallback_text, record_low_conf
-from app.core.gate import explain, is_strong
+from app.core.gate import explain, gate_decision, is_strong
 from app.db.models import LowConfQuestion
 
 
@@ -46,6 +46,28 @@ def test_only_top1_matters():
     """只看第一条。后面再高也不影响（这是当前设计的局限，不是 bug）。"""
     threshold = get_settings().evidence_threshold
     assert is_strong([_hit(threshold - 0.1), _hit(0.99)]) is False
+
+
+def test_gate_decision_three_states(monkeypatch):
+    settings = get_settings()
+    monkeypatch.setattr(settings, "evidence_threshold", 0.55)
+    monkeypatch.setattr(settings, "evidence_semantic_band", 0.05)
+    monkeypatch.setattr(settings, "evidence_semantic_enabled", True)
+
+    assert gate_decision([]) == "weak"
+    assert gate_decision([_hit(0.54)]) == "weak"
+    assert gate_decision([_hit(0.55)]) == "borderline"
+    assert gate_decision([_hit(0.57)]) == "borderline"
+    assert gate_decision([_hit(0.60)]) == "strong"
+
+
+def test_gate_decision_falls_back_when_semantic_disabled(monkeypatch):
+    settings = get_settings()
+    monkeypatch.setattr(settings, "evidence_threshold", 0.55)
+    monkeypatch.setattr(settings, "evidence_semantic_band", 0.05)
+    monkeypatch.setattr(settings, "evidence_semantic_enabled", False)
+
+    assert gate_decision([_hit(0.57)]) == "strong"
 
 
 def test_threshold_is_calibrated_not_default():

@@ -15,6 +15,7 @@
 | `LLMFormatError` | 模型没按格式返回（可恢复，重试或降级） | 调用点降级成安全默认值 |
 | 网络/鉴权异常 | 密钥错、超时、限流（不可恢复） | 直接上抛，由 API 层回 `error` 帧 |
 """
+import asyncio
 import json
 import logging
 from dataclasses import dataclass
@@ -54,11 +55,16 @@ async def structured_call(
     messages: list[dict[str, str]],
     *,
     temperature: float = 0.0,
+    timeout: float | None = None,
+    max_attempts: int = MAX_ATTEMPTS,
 ) -> dict[str, Any]:
     """强制模型以工具调用的形式返回结构化结果。
 
     `tool_choice` 指定具体函数 → 模型必须调用它，不会改回自然语言作答。
     temperature 默认 0：分类这类任务要可复现，抖动没有价值。
+
+    `timeout` / `max_attempts` 供短路径覆盖：语义闸在用户等待路径上，
+    必须 3s 内放弃且不重试，不能沿用分类任务的 30s + 重试。
     """
     tools = [
         {
@@ -70,13 +76,18 @@ async def structured_call(
     model = get_settings().chat_model
 
     last_error: Exception | None = None
-    for _ in range(MAX_ATTEMPTS):
-        response = await client.chat.completions.create(
+    for _ in range(max(1, max_attempts)):
+        request = client.chat.completions.create(
             model=model,
             messages=messages,
             tools=tools,
             tool_choice={"type": "function", "function": {"name": tool_name}},
             temperature=temperature,
+        )
+        response = (
+            await asyncio.wait_for(request, timeout=timeout)
+            if timeout is not None
+            else await request
         )
         message = response.choices[0].message
         if not message.tool_calls:

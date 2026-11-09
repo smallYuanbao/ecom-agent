@@ -85,7 +85,7 @@ from app.config import get_settings
 
 
 def is_strong(hits: list[dict]) -> bool:
-    """证据是否足够。空列表直接 False（fail-closed）。
+    """机械闸：证据是否过阈值。空列表直接 False（fail-closed）。
 
     **比较的是 `similarity`，不是 `distance`，也不是 `rrf_score`**：
 
@@ -96,6 +96,32 @@ def is_strong(hits: list[dict]) -> bool:
         return False
     threshold = get_settings().evidence_threshold
     return hits[0]["similarity"] >= threshold
+
+
+def gate_decision(hits: list[dict]) -> str:
+    """三态闸：strong / borderline / weak。
+
+    单阈值分不开「能分期付款吗」（0.572）和「FB-30 保修多久」（0.566），
+    所以边界带里的样本交给语义自评（见 `judge_evidence` 节点）。
+
+    关闭语义闸时，borderline 按旧行为直接 strong——回滚不需要改调用方。
+    """
+    if not hits:
+        return "weak"
+
+    similarity = float(hits[0].get("similarity") or 0.0)
+    threshold = get_settings().evidence_threshold
+    if similarity < threshold:
+        return "weak"
+
+    if not get_settings().evidence_semantic_enabled:
+        return "strong"
+
+    band = max(0.0, get_settings().evidence_semantic_band)
+    # 浮点边界：0.55 + 0.05 == 0.6000000000000001，直接比较会把 0.60 判成边界。
+    if similarity + 1e-9 >= threshold + band:
+        return "strong"
+    return "borderline"
 
 
 def explain(hits: list[dict]) -> dict:
