@@ -1,0 +1,215 @@
+# 困难检索集 v1：专测「稀有词」上的策略差异
+#
+# 为什么单独一份：knowledge_v1 的 42 条查询里，dense 已经 hit@3 = 1.00，
+# 再比也不会变。这份集子刻意堆型号（ST-20 / CS-04 / FB-30）、法条号
+# （第七条 / 第八条）、地区（西藏 / 内蒙古 / 港澳台）、发票类型等**稀有 token**——
+# 这些是 BM25 的主场，也是「dense 是不是真的够用」唯一可能翻案的地方。
+#
+# 字段与 knowledge_v1 相同：
+#   - `expect_ids`：正确答案所在 chunk，任一命中即算 hit；
+#   - `queries[].style`：formal / colloquial，用于观察口语化衰减；
+#   - 检索指标不需要 `points`，所以这里不写。
+#
+# 注意：这是**检索集**，不参与生成/闸的评测；不要拿它调 prompt。
+
+version: v1
+cases:
+  - id: H01
+    bucket: hard_product
+    expect_ids: ["products#婴儿推车 ST-20 轻便伞车"]
+    should_refuse: false
+    queries:
+      - {q: "ST-20 的最大承重是多少", style: formal}
+      - {q: "ST-20 折叠后能带上飞机吗", style: colloquial}
+
+  - id: H02
+    bucket: hard_product
+    expect_ids: ["products#婴儿推车 ST-60 高景观"]
+    should_refuse: false
+    queries:
+      - {q: "ST-60 新生儿可以平躺吗", style: formal}
+      - {q: "ST-60 最大能承重多少", style: colloquial}
+
+  - id: H03
+    bucket: hard_product
+    expect_ids:
+      - "products#儿童安全座椅 CS-04"
+      - "products#型号交叉点与选购提示"
+    should_refuse: false
+    queries:
+      - {q: "CS-04 可以反向安装到多少公斤", style: formal}
+      - {q: "CS-04L 和 CS-04 有什么区别", style: colloquial}
+
+  - id: H04
+    bucket: hard_product
+    expect_ids: ["products#儿童安全座椅 CS-12"]
+    should_refuse: false
+    queries:
+      - {q: "CS-12 支持反向安装吗", style: formal}
+
+  - id: H05
+    bucket: hard_product
+    expect_ids: ["products#辅食机 FB-10"]
+    should_refuse: false
+    queries:
+      - {q: "FB-10 能放进洗碗机吗", style: formal}
+
+  - id: H06
+    bucket: hard_product
+    expect_ids:
+      - "products#辅食机 FB-30"
+      - "products#型号交叉点与选购提示"
+    should_refuse: false
+    queries:
+      - {q: "FB-30 支持预约和保温吗", style: formal}
+      - {q: "哪款辅食机可以进洗碗机", style: colloquial}
+
+  - id: H07
+    bucket: hard_regulation
+    expect_ids: ["art-007"]
+    should_refuse: false
+    queries:
+      - {q: "第七条经确认可不适用退货的商品有哪些", style: formal}
+      - {q: "第七条说的哪类商品拆封后可以不退", style: colloquial}
+
+  - id: H08
+    bucket: hard_regulation
+    expect_ids: ["art-010"]
+    should_refuse: false
+    queries:
+      - {q: "第十条七天从哪天开始算", style: formal}
+
+  - id: H09
+    bucket: hard_regulation
+    expect_ids: ["art-012"]
+    should_refuse: false
+    queries:
+      - {q: "第十二条赠品要一起退回吗", style: formal}
+
+  - id: H10
+    bucket: hard_regulation
+    expect_ids: ["art-008"]
+    should_refuse: false
+    queries:
+      - {q: "第八条商品完好的标准是什么", style: formal}
+
+  - id: H11
+    bucket: hard_shipping
+    expect_ids:
+      - "shipping#包邮门槛"
+      - "faq#偏远地区怎么收费"
+      - "faq#多少钱包邮"
+    should_refuse: false
+    queries:
+      - {q: "西藏满多少包邮", style: formal}
+      - {q: "内蒙古偏远地区运费加多少", style: colloquial}
+      - {q: "港澳台发货吗", style: colloquial}
+
+  - id: H12
+    bucket: hard_invoice
+    expect_ids: ["invoice#专用发票的特殊条件"]
+    should_refuse: false
+    queries:
+      - {q: "能开增值税专用发票吗", style: formal}
+
+  - id: H13
+    bucket: hard_invoice
+    expect_ids: ["invoice#修改与重开"]
+    should_refuse: false
+    queries:
+      - {q: "发票抬头填错了还能改吗", style: colloquial}
+
+  - id: H14
+    bucket: hard_invoice
+    expect_ids: ["invoice#可开具的发票类型"]
+    should_refuse: false
+    queries:
+      - {q: "电子发票和纸质发票都能开吗", style: formal}
+
+  - id: H15
+    bucket: hard_member
+    expect_ids: ["member#各等级的权益"]
+    should_refuse: false
+    queries:
+      - {q: "金卡会员每个月免几次邮", style: formal}
+      - {q: "银卡会员生日券多少钱", style: colloquial}
+
+  - id: H16
+    bucket: hard_member
+    expect_ids: ["member#积分规则"]
+    should_refuse: false
+    queries:
+      - {q: "积分多久过期", style: formal}
+
+  - id: H17
+    bucket: hard_promo
+    expect_ids:
+      - "promo#有效期与过期"
+      - "faq#优惠券过期了怎么办"
+    should_refuse: false
+    queries:
+      - {q: "优惠券过期了还能补吗", style: colloquial}
+
+  - id: H18
+    bucket: hard_promo
+    expect_ids:
+      - "promo#退款后券的处理"
+      - "faq#退款后优惠券退吗"
+    should_refuse: false
+    queries:
+      - {q: "退款之后优惠券会退吗", style: formal}
+
+  - id: H19
+    bucket: hard_shipping
+    expect_ids: ["shipping#发货时效"]
+    should_refuse: false
+    queries:
+      - {q: "发货超过72小时有补偿吗", style: formal}
+
+  - id: H20
+    bucket: hard_shipping
+    expect_ids:
+      - "shipping#物流时效与异常处理"
+      - "faq#物流一般几天到"
+    should_refuse: false
+    queries:
+      - {q: "物流一般几天能到", style: colloquial}
+      - {q: "包裹显示签收但我没收到怎么办", style: colloquial}
+
+  - id: H21
+    bucket: hard_returns
+    expect_ids:
+      - "returns#赠品与各类优惠形式的处理"
+      - "art-012"
+    should_refuse: false
+    queries:
+      - {q: "赠品需要一起寄回吗", style: colloquial}
+
+  - id: H22
+    bucket: hard_returns
+    expect_ids: ["returns#退款到账时间"]
+    should_refuse: false
+    queries:
+      - {q: "退款多久能到账", style: formal}
+
+  - id: H23
+    bucket: hard_returns
+    expect_ids: ["returns#已发货但未收到时申请退款"]
+    should_refuse: false
+    queries:
+      - {q: "已发货但还没收到可以退款吗", style: colloquial}
+
+  - id: H24
+    bucket: hard_returns
+    expect_ids: ["returns#视为商品不完好的情形"]
+    should_refuse: false
+    queries:
+      - {q: "哪些情况算商品不完好", style: formal}
+
+  - id: H25
+    bucket: hard_product
+    expect_ids: ["products#型号交叉点与选购提示"]
+    should_refuse: false
+    queries:
+      - {q: "哪款安全座椅可以反向安装到18公斤", style: colloquial}
+      - {q: "ST-20 和 ST-60 的折叠尺寸差多少", style: formal}

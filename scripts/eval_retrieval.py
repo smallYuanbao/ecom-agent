@@ -1,16 +1,22 @@
 """检索策略对比：dense / bm25 / hybrid，同一批查询。
 
-**只报点估计是没有意义的。** 45 条查询 / 15 道基础题，置信区间宽到 ±12~20pp，
+**只报点估计是没有意义的。** 42 条查询 / 14 道基础题，置信区间宽到 ±12~20pp，
 所以这里同时输出：
 
 - hit@3 的 **Wilson 95% 置信区间**
 - 相对 dense 的**不一致对数**（McNemar 的原料）——单向差 6 条以上才算显著
-- 每种策略**失败的具体查询**——45 条的汇总数字信息量低，失败样本信息量高
+- 每种策略**失败的具体查询**——汇总数字信息量低，失败样本信息量高
+
+两套查询：
+
+- `knowledge`（默认）：`knowledge_v1.yaml`，日常召回回归；
+- `hard`：`retrieval_hard_v1.yaml`，刻意堆型号 / 法条号 / 地区 / 发票类型，
+  用来回答「dense 是不是真的够用」——这些稀有 token 是 BM25 的主场。
 
 用法：
 
     uv run python scripts/eval_retrieval.py
-    uv run python scripts/eval_retrieval.py --out docs/reports/retrieval-eval.md
+    uv run python scripts/eval_retrieval.py --set hard --out /tmp/hard.md
 """
 import argparse
 import asyncio
@@ -22,11 +28,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))  # 允许 `python scripts/eval_retrieval.py` 直接跑
 
-from app.core.eval_set import EvalQuery, load_queries
+from app.core.eval_set import EVAL_DIR, EvalQuery, load_queries
 from app.core.kb_version import kb_version
 from app.core.retrieval import search
 
 STRATEGIES = ("dense", "bm25", "hybrid")
+SETS = {
+    "knowledge": EVAL_DIR / "knowledge_v1.yaml",
+    "hard": EVAL_DIR / "retrieval_hard_v1.yaml",
+}
 TOP_K = 5
 HIT_AT = 3
 
@@ -138,19 +148,20 @@ def render(
     raws: dict[str, dict],
     n_cases: int,
     queries: list[EvalQuery],
+    set_name: str,
 ) -> str:
     from datetime import datetime
 
     all_fail, majority_fail = common_weakness(raws, queries)
     lines = [
-        "# 检索策略对比（Ch02 Task 5）",
+        "# 检索策略对比",
         "",
         (f"> 生成时间：{datetime.now():%Y-%m-%d %H:%M} ｜ "
-         f"语料 kb_version=`{kb_version()}`"),
+         f"语料 kb_version=`{kb_version()}` ｜ 查询集 `{set_name}`"),
         (f"> 规模：{n_cases} 道基础题 / {len(queries)} 条查询 ｜ "
          f"策略 {len(STRATEGIES)} ｜ 取回 {TOP_K} 条 / 评估前 {HIT_AT} 条"),
         "",
-        (f"> 评测集：`data/eval/knowledge_v1.yaml`（{n_cases} 道基础题展开的查询，"
+        (f"> 评测集：`data/eval/{set_name}`（{n_cases} 道基础题展开的查询，"
          "拒答题不计入检索指标）"),
         f"> 指标：hit@{HIT_AT}，取回 {TOP_K} 条候选",
         ("> **本文件是自动生成的原始数据**，决策与解读见 "
@@ -231,10 +242,14 @@ def render(
 async def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", help="把报告写到这个路径（markdown）")
+    parser.add_argument(
+        "--set", dest="set_name", default="knowledge", choices=sorted(SETS),
+        help="knowledge = 日常召回集；hard = 型号/法条号等稀有词集",
+    )
     args = parser.parse_args()
 
     # 拒答题没有 expect_id，检索指标无意义（它们由证据闸 + 生成侧评估）
-    queries = [q for q in load_queries() if not q.should_refuse]
+    queries = [q for q in load_queries(SETS[args.set_name]) if not q.should_refuse]
 
     results = {}
     for strategy in STRATEGIES:
@@ -242,7 +257,10 @@ async def main() -> int:
         results[strategy] = await evaluate(strategy, queries)
 
     summaries = [summarize(results[s], queries) for s in STRATEGIES]
-    report = render(summaries, results, len({q.case_id for q in queries}), queries)
+    report = render(
+        summaries, results, len({q.case_id for q in queries}), queries,
+        set_name=SETS[args.set_name].name,
+    )
 
     print()
     print(report)
