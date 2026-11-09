@@ -432,10 +432,12 @@ uv run python scripts/export_evalflow.py --import --base-url http://localhost:80
 ### Task 8: 阈值扫描 + 质量传导（P7-6/P7-7）
 
 **Files:**
-- Modify: `scripts/eval_gate.py`（支持 `eval_v1` 与输出曲线）
-- Modify: `scripts/eval_knowledge.py`（如需要支持 `eval_v1` 的 B1 子集）
+- Modify: `scripts/eval_gate.py`（`eval_v1`、0.40–0.75 曲线、语义闸模拟、CSV）
+- Modify: `scripts/eval_knowledge.py`（`eval_v1` B1、top1/top3 双口径、受控降级参数）
+- Create: `docs/reports/gate-thresholds.md` / `.csv`
 - Create: `docs/reports/quality-propagation.md`
-- Update: `docs/reports/gate-eval.md`
+- Create: `tests/eval/test_eval_gate.py` / `tests/eval/test_eval_knowledge.py`
+- Update: `docs/reports/gate-eval.md`、spec §5.4
 
 **Step 1: 阈值扫描**
 
@@ -457,6 +459,28 @@ uv run python scripts/export_evalflow.py --import --base-url http://localhost:80
 `gate-eval.md`：追加本轮曲线与决策。
 
 **Commit:** `docs(eval): 阈值曲线与质量传导`
+
+**完成记录（2026-11-09）**
+
+- 曲线：0.40–0.75 × 0.01，机械 + 语义双列；原始数据在 `gate-thresholds.csv`。
+- 结果：机械闸无法双零（0.53–0.56 时「能分期付款吗」仍漏，9.1%）；
+  语义闸把双零区间扩到 **0.53–0.56**，0.55 位于中部，**维持 0.55**。
+- 质量传导：自然 top5 的 hit@3 = 42/42，四格中两格为空（上限效应）；
+  用严格 top1 + 截断 gold + 错误证据三组实验补齐，四格均有样本。
+- 人工核验：4 条「检索未命中但答案完整」，全部能在给定证据里找到依据，**0 条编造**；
+  错误证据抽检 10 条同样 0 编造。
+- 测试：`test_eval_gate.py` + `test_eval_knowledge.py` 共 **14 条**通过。
+- 偏差：新增了语义闸模拟与受控降级参数，超出原 Step 1/2 的字面范围；
+  理由和条件已写进 spec §5.4 与 `quality-propagation.md`。
+
+**Task 8 补（2026-11-09）：检索选型复核**
+
+- 新增 `data/eval/retrieval_hard_v1.yaml`：25 题 / 35 条查询，
+  覆盖型号、法条号、地区、发票类型等稀有词；
+- `eval_retrieval.py --set hard`：dense 1.00 / hybrid 1.00 / bm25 0.97，
+  hybrid 仍 0:0 不一致，**维持 dense**，关闭 Ch02「Ch07 需加难度」待办；
+- 修快照：`/api/meta` 增加 `retrieval_strategy`，EvalFlow 快照以外部 meta 为准，
+  不再把 ecom 的 dense 误记成 hybrid。
 
 ---
 

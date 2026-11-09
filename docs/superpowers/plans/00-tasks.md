@@ -52,6 +52,8 @@
 **Ch02 交付情况**：P2-1 ~ P2-8 全部完成。额外交付了检索选型实验
 （`docs/reports/retrieval-eval.md`：dense 1.00 / hybrid 0.95 / bm25 0.76）
 与证据闸校准（`docs/reports/gate-eval.md`：阈值 0.55）。
+**Ch07 已关闭检索选型待办**：35 条稀有词困难集（`retrieval-eval-hard.md`）
+dense 1.00 / hybrid 1.00 / bm25 0.97，维持 dense。
 完整验收见 [ch02-acceptance.md](../../reports/ch02-acceptance.md)。
 
 ---
@@ -155,9 +157,9 @@ D 的建单（P4-3）仍待做。
 | P7-2 | 客观 gold 手算 | L3 | 同上 | 金额/转人工有标准答案 | ✅ |
 | P7-3 | `kb_version` 内容哈希 | K6 | `app/core/kb_version.py` | 改文档后哈希变化 | ✅ |
 | P7-4 | 导入 EvalFlow 跑第一轮 | L1 | `docs/reports/run-01.md` | 指标产出 | ✅ |
-| P7-5 | 修失败样本跑第二轮 | — | `docs/reports/run-02.md` | 指标变化可解释 | ⏳ |
-| P7-6 | 阈值扫描 | 置信度讨论 | 报告一节 | 误放/误拦曲线 | ⏳ |
-| P7-7 | **质量传导对照**：同批知识样本上把「检索命中」×「答案覆盖要点」列成 2×2 | L1、K6 | `docs/reports/quality-propagation.md` | 四格都有样本；给出「检索未命中但答案完整」的比例，人工核验 3 条是否编造 | ⏳ |
+| P7-5 | 修失败样本跑第二轮 | — | `docs/reports/run-02.md` | 指标变化可解释 | ✅ |
+| P7-6 | 阈值扫描 | 置信度讨论 | `docs/reports/gate-thresholds.md` | 误放/误拦曲线；0.53–0.56 双零，维持 0.55 | ✅ |
+| P7-7 | **质量传导对照**：同批知识样本上把「检索命中」×「答案覆盖要点」列成 2×2 | L1、K6 | `docs/reports/quality-propagation.md` | 四格有样本；人工核验 4 条，0 编造 | ✅ |
 | P7-8 | **退款困难组扩充 + 评测方法论**：现有 10 条转为 dev set；新增 10–20 条按失败类型分层（规则顺序 / 字段粒度 / 数据缺口 / 语义模糊 / 多轮补充），**新增部分只做盲测，不参与调 prompt**；报告加 Wilson 95% CI 与 per-class 准确率 | Ch03 验收（n=10，CI [40%, 89%]） | `data/eval/refund_hard_test.json`、`scripts/eval_refund.py` | 困难组 n ≥ 20；每类 ≥ 3 条；报告给出 CI 与分类准确率；盲测集不参与调参 | ⏳ |
 
 **为什么 P7-8 在 Ch07 而不是 Ch03 补**：Ch03 的 10 条已经用来改过两次 prompt

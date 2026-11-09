@@ -15,6 +15,10 @@
 | 7 | 2026-11-09 | Task 6 · 导入 EvalFlow + run-01 | 未提交 |
 | 8 | 2026-11-09 | Task 7 前置 · FAQ 知识层与层内回归 | 未提交 |
 | 9 | 2026-11-09 | Task 7 前置 · 语义证据闸 | 未提交 |
+| 10 | 2026-11-09 | Task 7 · run-02 修复与对比 | 未提交 |
+| 11 | 2026-11-09 | Task 7 补 · judge 方差校验（3 次重复） | 未提交 |
+| 12 | 2026-11-09 | Task 8 · 阈值曲线 + 质量传导 | 未提交 |
+| 13 | 2026-11-09 | Task 8 补 · 检索选型复核 + 快照修正 | 未提交 |
 
 ---
 
@@ -500,3 +504,187 @@ retrieve
 - `uv run pytest tests/core/test_gate.py tests/graph/test_knowledge_node.py -q` → 通过
 - 全量 → **970 passed, 20 skipped**
 - 知识出口语义闸后：42/42 放行、40/40 要点覆盖
+
+---
+
+## 10 · Task 7 · run-02 修复与对比（未提交）
+
+### 新增 / 修改
+
+| 文件 | 内容 |
+|---|---|
+| `docs/reports/run-02.md` | EvalFlow run #32：新 KB + 语义闸，逐桶对比 run-01 |
+| `docs/reports/run-local-05.md` | 确定性回归 44/44 |
+| `docs/reports/README.md` | 评测报告索引补 run-01 / run-02 |
+
+### 运行条件
+
+- 知识库 `kb_version=80bd26573951`（57 chunks，含 15 条 FAQ）
+- 语义闸开启：阈值 0.55、band 0.05、自评 timeout 3s、不重试
+- 数据集哈希与 run-01 相同，模型 / judge prompt 不变
+
+### 结果
+
+| 指标 | run-01 | run-02 | Δ |
+|---|---|---|---|
+| recall | 0.95 | 1.00 | +0.05 |
+| context_precision | 0.91 | 0.87 | −0.04 |
+| context_recall | 0.90 | 1.00 | +0.10 |
+| answer_relevance | 0.8614 | 0.9045 | +0.0431 |
+| answer_correctness | 0.9818 | 0.9977 | +0.0159 |
+| 确定性通过 | 44/44 | 44/44 | 0 |
+
+- B1 correctness 0.92 → 0.99：`退货政策是什么` 0.3 → 1.0，FAQ 补上 7 天窗口；
+- context 类指标覆盖率从 10/44 修正为 **10/10**（旧代码写 NULL 行的展示问题）；
+- relevance 的提升主要是 **judge 方差**：注入样本两轮回答逐字相同，判分 0.0 → 0.9；
+- context_precision 降 0.04：FAQ 与 returns/member 块语义重叠，top-5 出现同事实两份表述。
+
+### 盲测
+
+- 本轮改动只涉及 dev 桶；B1 的 10 条全部 `split=dev`；
+- test 集 28 条未参与调参；
+- 未修复项与已接受项见 `run-02.md`「未修复（已接受）」表。
+
+### 验证
+
+- 确定性回归：`eval_e2e.py` → **44/44**
+- EvalFlow run #32 → done，44/44 样本，$0.09289
+- 语义闸无自评失败日志；手工复核对边界样本仍按预期放行 / 拦住
+
+---
+
+## 11 · Task 7 补 · judge 方差校验（未提交）
+
+### 问题
+
+run-02 里出现「同一回答 judge 一次 0.0、一次 0.9」。在解释 run-01→run-02 的
+指标变化、以及做 Task 8 阈值扫描之前，先量化重复运行的噪声。
+
+### 新增
+
+| 文件 | 内容 |
+|---|---|
+| `docs/reports/judge-variance.md` | 同批 44 条跑 3 次（#32/#33/#34）的均值 / 标准差 / 极差 |
+| `docs/reports/run-02.md` | 结论与限制同步：relevance 的 Δ 不再归因于 FAQ |
+| `docs/reports/README.md` | 索引补方差报告 |
+
+### 结果（44 条 × 3 次，judge_samples=1）
+
+| 指标 | 均值 | 标准差 | 极差 |
+|---|---|---|---|
+| answer_correctness | 0.9977 | 0.0023 | 0.0045 |
+| answer_relevance | 0.8867 | 0.0195 | 0.0386 |
+| context_precision | 0.885 | 0.0132 | 0.025 |
+| recall / context_recall / faithfulness | 1.000 | 0 | 0 |
+
+- 回答文本只有 20/44 三次完全一致（`temperature=0.2`），但 correctness 几乎不受影响；
+- relevance 波动集中在 B5–B7 的兜底话术：4 条**同回答**被 judge 判出 0.3–0.9 的跨度；
+- B1 / B2 的 relevance 零波动，B3 / B4 只有 0.9–1.0 的小幅抖动。
+
+### 结论调整
+
+- 可信：correctness 0.9818→0.9977（约 7 SD）与 recall / context_recall 的提升；
+- 不可信：relevance 0.8614→0.9045 与 context_precision 0.91→0.87，均落在噪声带内；
+- Task 8 起，阈值与质量传导只用确定性指标；扩展样本放到验收之后，先不改 44 条。
+
+### 验证
+
+- EvalFlow run #33 / #34 均 done，44/44 样本；
+- 三轮快照的 `kb_version` / `dataset_hash` / 模型一致；
+- 逐题数据 `/tmp/run3{2,3,4}-traces.json`，统计脚本可复现报告中的均值与极差。
+
+---
+
+## 12 · Task 8 · 阈值曲线 + 质量传导（未提交）
+
+### 修改
+
+| 文件 | 内容 |
+|---|---|
+| `scripts/eval_gate.py` | 0.40–0.75 / 步长 0.01 曲线；机械与语义双列；`--set eval_v1`；`--csv` |
+| `scripts/eval_knowledge.py` | 同时输出 top3 / top1 两套 2×2；`--set eval_v1`；受控降级参数 |
+| `tests/eval/test_eval_gate.py` | 扫描范围、边界带、fail-closed、比率、去重（7 条） |
+| `tests/eval/test_eval_knowledge.py` | eval_v1 要点解析、top1/top3 口径（7 条） |
+
+### 新增
+
+| 文件 | 内容 |
+|---|---|
+| `docs/reports/gate-thresholds.md` | 36 个阈值的完整曲线（机械 + 语义） |
+| `docs/reports/gate-thresholds.csv` | 同上的原始数据 |
+| `docs/reports/quality-propagation.md` | 四格来源、人工核验、错误证据抽检 |
+
+### 阈值结果
+
+- 机械闸：0.53–0.56 可答题 42/42，但误放「能分期付款吗」9.1%；
+  升到 0.58 才能全拦，代价是误拦 2.4%。
+- 语义闸：**0.53–0.56 双零**；0.55 位于平台中部，两侧余量约 0.02。
+- 决策：**维持 0.55**。`gate-eval.md` 追加曲线与本轮决策。
+
+### 质量传导结果
+
+- 自然 top5：hit@3 42/42，40 条计分样本全部「命中且完整」；
+- 严格 top1：3 条未命中，人工核验 2 条有依据、1 条是正则误报（回答本身安全）；
+- 截断 gold（8 条）：1 条缺要点，回答明确说「资料里没有提到」；
+- 错误证据（10 条）：0 编造；7 条只覆盖部分要点并指出缺什么，1 条信息在证据里；
+- 「检索未命中但答案完整」人工核验 4 条，均非编造。
+
+### 验证
+
+- `pytest tests/eval/test_eval_gate.py tests/eval/test_eval_knowledge.py` → **14 passed**
+- `ruff check` 四个文件 → 通过
+- 曲线与 2×2 的生成命令见各自报告末尾
+
+---
+
+## 13 · Task 8 补 · 检索选型复核 + 快照修正（未提交）
+
+### 背景
+
+Ch02 的选型结论留了一个待办：dense 在 42 条查询上已经 hit@3 = 1.00，
+「这批题无法再区分策略，Ch07 需加难度」。Ch07 的 FAQ 回归仍然 dense 1.00 /
+hybrid 1.00 / bm25 0.81，没能翻案。
+
+### 新增
+
+| 文件 | 内容 |
+|---|---|
+| `data/eval/retrieval_hard_v1.yaml` | 25 道基础题 / 35 条查询；型号（ST-20 / CS-04 / FB-30）、法条号（第七/八/十/十二条）、地区（西藏 / 内蒙古 / 港澳台）、发票类型 |
+| `docs/reports/retrieval-eval-hard.md` | 三策略在困难集上的 hit@3 / MRR / 失败样本 |
+| `scripts/eval_retrieval.py` | 新增 `--set knowledge|hard`，不改变默认行为 |
+| `tests/eval/test_eval_retrieval.py` | 困难集结构、查询数、gold id 存在性、`--set` 路径 |
+
+### 结果
+
+| 策略 | hit@3 | 95% CI | MRR | 相对 dense |
+|---|---|---|---|---|
+| dense | 1.00 | 0.90–1.00 | 0.948 | — |
+| bm25 | 0.97 | 0.85–0.99 | 0.829 | 1 : 0（不显著） |
+| hybrid | 1.00 | 0.90–1.00 | 0.962 | 0 : 0（不显著） |
+
+- BM25 唯一失败：`积分多久过期` → 命中 `returns#赠品与各类优惠形式的处理`；
+- hybrid 的 MRR 略高（0.962 vs 0.948），但 **hit 完全一致（0:0）**，
+  且 Top5 都含 gold，对生成没有可观察收益；
+- 结论：**维持 dense**，hybrid 留配置项，BM25 保留实现、默认不用。
+  Ch02 的「Ch07 需加难度」待办关闭。
+
+### 快照修正
+
+run-02 的 `Run.config.retrieval` 写成 `hybrid`，但 ecom 实际是 `dense`：
+`build_snapshot` 在没传 config 时回退 hybrid，而 ecom 的 top_k / retrieval
+参数根本不生效（见 `external_ecom` 文档）。
+
+| 文件 | 改动 |
+|---|---|
+| `app/config.py` | `safe_summary()` 增加 `retrieval_strategy`，`/api/meta` 可见 |
+| `evalflow/backend/snapshot.py` | `effective_retrieval()`：外部 meta 报了就覆盖请求值；`config_retrieval` 接受 bm25 |
+| `evalflow/tests/test_snapshot.py` | 外部 meta 覆盖、缺省回退、非法值回退 |
+| `tests/security/test_logging.py` | `/api/meta` 必须带 `retrieval_strategy` |
+
+历史 run 的 config 不重写；下一次 run 会记录实际策略。
+
+### 验证
+
+- `pytest tests/security/test_logging.py` → 11 passed
+- `pytest tests/test_snapshot.py`（evalflow）→ 7 passed
+- 困难集报告由 `scripts/eval_retrieval.py --set hard` 生成

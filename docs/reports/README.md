@@ -30,13 +30,19 @@
 
 | 文件 | 内容 | 什么时候看 |
 |---|---|---|
+| [run-01.md](./run-01.md) | EvalFlow 首轮基线（旧 KB，44 条） | 对比基线 |
+| [run-02.md](./run-02.md) | 新 KB + 语义闸复跑；与 run-01 逐桶对比 | 改知识层 / 闸后 |
+| [judge-variance.md](./judge-variance.md) | 同批 44 条跑 3 次的 judge 方差；哪些 Δ 可信 | 解读任何指标变化前 |
 | [retrieval-eval.md](./retrieval-eval.md) | dense / bm25 / hybrid 三策略对比，hit@3、MRR | 改检索策略前 |
 | [gate-eval.md](./gate-eval.md) | 证据闸阈值标定（0.55） | 调 `evidence_threshold` 前 |
 | [knowledge-eval.md](./knowledge-eval.md) | 知识出口的覆盖率与引用质量 | 改语料或 prompt 后 |
 | [retrieval-eval-faq.md](./retrieval-eval-faq.md) | 加入 FAQ 后的检索策略对比 | 改 FAQ / 切分后 |
+| [retrieval-eval-hard.md](./retrieval-eval-hard.md) | 稀有词困难集：型号 / 法条 / 地区 / 发票 | 检索选型复核 |
 | [gate-eval-faq.md](./gate-eval-faq.md) | 加入 FAQ 后的闸校准 | 改知识库后 |
 | [knowledge-eval-faq.md](./knowledge-eval-faq.md) | 加入 FAQ 后的知识覆盖与质量传导 | 改 FAQ / prompt 后 |
 | [gate-eval-semantic.md](./gate-eval-semantic.md) | 语义证据闸：边界样本、误杀与延迟 | 改语义闸 / prompt 后 |
+| [gate-thresholds.md](./gate-thresholds.md) | 0.40–0.75 阈值曲线：机械 / 语义的误拦与误放 | 调 `evidence_threshold` 前 |
+| [quality-propagation.md](./quality-propagation.md) | 检索→答案 2×2、四格来源、人工核验 | 改检索 / 生成 prompt 后 |
 | [knowledge-eval-semantic.md](./knowledge-eval-semantic.md) | 语义闸后的知识覆盖与闸放行 | 改语义闸后 |
 | [refund-eval.md](./refund-eval.md) | 退款判定：模型 / 规则 / 流水线三列，未命中归因 | 改 prompt 或规则表前后 |
 
