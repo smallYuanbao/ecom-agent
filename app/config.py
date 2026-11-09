@@ -73,6 +73,7 @@ class Settings(BaseSettings):
             "chat_model": self.chat_model,
             "embed_model": self.embed_model,
             "prompt_version": self.prompt_version,
+            "retrieval_strategy": self.retrieval_strategy,
             "kb_version": self.kb_version,
             "chat_api_key": "<set>" if self.chat_api_key else "<unset>",
             "langfuse": "on" if all(

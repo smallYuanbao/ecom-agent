@@ -79,6 +79,7 @@ def test_safe_summary_reports_key_status_only():
     summary = Settings(chat_api_key="sk-abcdefghijklmnop1234").safe_summary()
 
     assert summary["chat_api_key"] == "<set>"
+    assert summary["retrieval_strategy"] in ("dense", "bm25", "hybrid")
     assert "sk-abcdefghijklmnop1234" not in json.dumps(summary)
 
 
