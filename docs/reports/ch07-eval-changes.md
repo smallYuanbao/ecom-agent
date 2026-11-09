@@ -12,6 +12,9 @@
 | 4 | 2026-11-08 | Task 3 补 · judge / 红线修复（run-local-03） | 未提交 |
 | 5 | 2026-11-08 | Task 3 补2 · test 集净化（run-local-04） | 未提交 |
 | 6 | 2026-11-08 | Task 4/5 · EvalFlow 适配与指标语义 | 未提交 |
+| 7 | 2026-11-09 | Task 6 · 导入 EvalFlow + run-01 | 未提交 |
+| 8 | 2026-11-09 | Task 7 前置 · FAQ 知识层与层内回归 | 未提交 |
+| 9 | 2026-11-09 | Task 7 前置 · 语义证据闸 | 未提交 |
 
 ---
 
@@ -337,3 +340,163 @@ B08 / B09 / B10 / B11 在第一轮跑成「追问原因」后，补了「不想�
 - 真实联调：`run_pipeline_ecom("退货政策是什么")` 返回 answer + 5 hits + 811 字 context；
   `fetch_meta()` 返回 `kb_version` / `chat_model` / `prompt_version`
 - 启动提醒：worker 与 API 都要带 `EVAL_TARGET=ecom` 重启
+
+---
+
+## 7 · Task 6 · 导入 EvalFlow + run-01（未提交）
+
+### 做了什么
+
+1. ecom 评测实例起在 `127.0.0.1:8081`（独立 `data/eval.db`）；
+2. EvalFlow API + worker 以 `EVAL_TARGET=ecom` 重启；
+3. `scripts/export_evalflow.py --import` 导入 44 条到 `ecom-eval-v1`；
+4. 发起 run **#31**，44/44 样本完成；
+5. 写 [run-01.md](./run-01.md)。
+
+### 指标修正
+
+第一次 run #29 暴露了两个口径问题：
+
+| 问题 | 修法 |
+|---|---|
+| B3/B4 的 policy 检索被算进 hit@k / MRR | 只有 `has_context`（有回答证据）时才计算；否则**不写评分行**（不适用 ≠ 失败） |
+| judge 不认识 `/` 与 `\|` 的要点语法 | 在 context_recall / answer_correctness prompt 里解释：`/` 分组、`\|` 任选 |
+
+修后 run #31：
+
+| 指标 | 值 |
+|---|---|
+| recall | 0.95 |
+| hit_at_k / MRR | 1.00 / 1.00 |
+| context_precision | 0.91 |
+| context_recall | 0.90 |
+| faithfulness | 1.00 |
+| answer_relevance | 0.8614 |
+| answer_correctness | 0.9818 |
+
+### 归因
+
+- B1 一条 `退货政策是什么` answer_correctness 0.3：回答缺 7 天窗口，检索也偏向「不适用商品」块；
+- B5/B6/B7 answer_relevance 0.5–0.6：转人工/拒答被通用 relevance judge 判成“不相关”，
+  但 answer_correctness 都是 1.0，属于安全行为；
+- 确定性本地检查 run-local-04 仍是 **44/44**。
+
+### 验证
+
+- EvalFlow 全量 → **126 passed**
+- ecom 全量 → **960 passed, 24 skipped**
+- EvalFlow run #31 → 44/44 完成
+- 覆盖率口径已改为「不适用不写行」；run #31 未重跑，`run-01.md` 已注明
+  下一轮 run-02 会显示 `10 / 10`，指标均值不受影响
+
+---
+
+## 8 · Task 7 前置 · FAQ 知识层与层内回归（未提交）
+
+### 问题
+
+B1 的 `退货政策是什么` 只答了「不适用商品」，没提 7 天窗口。
+诊断：7 天规则在 `returns.md` 里，但检索 top-5 只取到「不适用商品」块，
+`returns#七日无理由退货的适用范围` 排第 8。宽泛问法没有对应的 FAQ/总览 chunk。
+
+参考 MewHelp：`data/kb/product-faq.md` 用「用户问法做标题」建 FAQ chunk，
+标题参与 embedding + BM25，宽泛问题能直接命中。
+
+### 新增
+
+| 文件 | 内容 |
+|---|---|
+| `data/kb/faq.md` | 15 条 FAQ：退货 4 / 运费物流 6 / 优惠券 5 |
+
+FAQ 只做摘要与导航，详细条款仍在原政策文件里。
+
+### 重建与回归
+
+- 重建 Chroma：chunk **41 → 57**，`kb_version` **2f59fbaa6c7a → 80bd26573951**；
+- 证据列表加入 FAQ id（`expect_ids`），并把「可以登机 / 定做 / 你承担」等
+  常见说法补进要点正则。
+
+| 指标 | 改前 | 改后 |
+|---|---|---|
+| dense hit@3 | 1.00 | 1.00 |
+| dense MRR | 0.948 | **0.964** |
+| bm25 hit@3 | 0.76 | **0.81** |
+| hybrid hit@3 | 0.95 | **1.00** |
+| 知识要点全覆盖 | 39/40（98%） | **40/40（100%）** |
+| 闸放行率 | 42/42 | 42/42 |
+
+检索报告：[retrieval-eval-faq.md](./retrieval-eval-faq.md)
+闸报告：[gate-eval-faq.md](./gate-eval-faq.md)
+知识报告：[knowledge-eval-faq.md](./knowledge-eval-faq.md)
+
+### 结论
+
+FAQ 层解决了宽泛问法的召回，没有牺牲精确检索：
+
+- dense 仍 1.00，MRR 略升；
+- bm25/hybrid 因 FAQ 补足标题匹配而上升；
+- 知识要点覆盖达到 40/40。
+
+### 下一步
+
+- 其他分类（发票 / 会员 / 商品 / 法规）按 `low_conf_questions` 池后续补；
+- 用新 KB 跑 run-02。
+
+---
+
+## 9 · Task 7 前置 · 语义证据闸（未提交）
+
+### 问题
+
+机械闸只有一个 top1 阈值，分不开：
+
+```
+能分期付款吗    0.572  → member#积分规则（话题近，没有答案）
+FB-30 保修多久  0.566  → products#辅食机 FB-30（确实有答案）
+```
+
+### 新增 / 修改
+
+| 文件 | 内容 |
+|---|---|
+| `app/core/gate.py` | `gate_decision` 三态：strong / borderline / weak |
+| `app/core/evidence_judge.py` | 证据充分性自评：3s 超时、不重试 |
+| `app/core/prompts.py` | `EVIDENCE_JUDGE_SYSTEM` + 四区消息 |
+| `app/core/llm.py` | `structured_call` 支持短 timeout / 单次尝试 |
+| `app/graph/knowledge.py` | 新增 `judge_evidence` 节点；边界才调 LLM |
+| `app/graph/state.py` | `evidence_strong` / `evidence_judge` |
+| `app/config.py` | `evidence_semantic_enabled` / `band` / `judge_timeout` |
+
+### 闸流程
+
+```
+retrieve
+  ├─ top1 < 0.55          → weak
+  ├─ top1 >= 0.60         → strong（不调 LLM）
+  └─ 0.55 ≤ top1 < 0.60   → judge_evidence（3s）
+        ├─ sufficient=true  → strong
+        └─ false / 超时 / 异常 → weak（fail-closed）
+```
+
+### 结果
+
+| 类型 | 条数 | 机械闸 | 语义闸后 |
+|---|---|---|---|
+| 可答题 | 42 | 42 放行 | **42 放行** |
+| 该拒答 | 3 | 3 拦住 | 3 拦住 |
+| 域外探测 | 8 | 7 拦住 | **8 拦住** |
+
+边界 4 条全部判对：
+
+- 能分期付款吗 → false（拦住）；
+- FB-30 保修多久 / CS-04 反向安装 / 能寄到国外 → true（放行）。
+
+延迟：单次自评约 **1.1s**，上限 **3s**，不重试；C/E 路径不变。
+报告：[gate-eval-semantic.md](./gate-eval-semantic.md)、
+[knowledge-eval-semantic.md](./knowledge-eval-semantic.md)。
+
+### 验证
+
+- `uv run pytest tests/core/test_gate.py tests/graph/test_knowledge_node.py -q` → 通过
+- 全量 → **970 passed, 20 skipped**
+- 知识出口语义闸后：42/42 放行、40/40 要点覆盖

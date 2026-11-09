@@ -33,6 +33,11 @@
 | [retrieval-eval.md](./retrieval-eval.md) | dense / bm25 / hybrid 三策略对比，hit@3、MRR | 改检索策略前 |
 | [gate-eval.md](./gate-eval.md) | 证据闸阈值标定（0.55） | 调 `evidence_threshold` 前 |
 | [knowledge-eval.md](./knowledge-eval.md) | 知识出口的覆盖率与引用质量 | 改语料或 prompt 后 |
+| [retrieval-eval-faq.md](./retrieval-eval-faq.md) | 加入 FAQ 后的检索策略对比 | 改 FAQ / 切分后 |
+| [gate-eval-faq.md](./gate-eval-faq.md) | 加入 FAQ 后的闸校准 | 改知识库后 |
+| [knowledge-eval-faq.md](./knowledge-eval-faq.md) | 加入 FAQ 后的知识覆盖与质量传导 | 改 FAQ / prompt 后 |
+| [gate-eval-semantic.md](./gate-eval-semantic.md) | 语义证据闸：边界样本、误杀与延迟 | 改语义闸 / prompt 后 |
+| [knowledge-eval-semantic.md](./knowledge-eval-semantic.md) | 语义闸后的知识覆盖与闸放行 | 改语义闸后 |
 | [refund-eval.md](./refund-eval.md) | 退款判定：模型 / 规则 / 流水线三列，未命中归因 | 改 prompt 或规则表前后 |
 
 **共同约定**：每份都要写清数据来源、样本量、结论的适用边界。

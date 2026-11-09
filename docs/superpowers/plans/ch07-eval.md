@@ -396,6 +396,14 @@ uv run python scripts/export_evalflow.py --import --base-url http://localhost:80
 
 只修 **run-01 中有归因的根因**，不按单题打补丁：
 
+**已完成的前置修复（2026-11-09）**：
+
+- 新增 `data/kb/faq.md`（15 条），解决「退货政策是什么」等宽泛问法的 top-5 召回；
+  chunk 41→57，`kb_version=80bd26573951`；dense hit@3 1.00 / MRR 0.964，
+  知识要点覆盖 40/40。详见改动记录 §8。
+- 语义证据闸：机械三态 + 0.55–0.60 边界自评，3s 超时、不重试、fail-closed；
+  域外探测 8/8 拦住，可答题 42/42 放行。详见改动记录 §9。
+
 | 失败类型 | 允许的修法 |
 |---|---|
 | 路由错 | 补 intent 示例 / 路由规则 |
