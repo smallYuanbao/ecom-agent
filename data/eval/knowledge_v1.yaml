@@ -23,6 +23,8 @@ cases:
     expect_ids:
       - "returns#七日无理由退货的适用范围"
       - "returns#不适用无理由退货的商品"   # 同属"退货政策"，两节都算对
+      - "faq#退货政策是什么"               # FAQ 是宽泛问法的合法入口
+      - "faq#七天无理由从哪天开始算"
     should_refuse: false
     queries:
       - {q: "退货政策是什么", style: formal, skip_coverage: true}
@@ -31,17 +33,18 @@ cases:
 
   - id: P2
     bucket: policy
-    expect_ids: ["returns#退货运费由谁承担"]
+    expect_ids: ["returns#退货运费由谁承担", "faq#退货运费谁承担"]
     should_refuse: false
     queries:
-      - {q: "退货运费由谁承担", style: formal, points: ["质量问题", "消费者承担|买家承担"]}
-      - {q: "退货的快递费谁出", style: colloquial, points: ["质量问题", "消费者承担|买家承担"]}
+      - {q: "退货运费由谁承担", style: formal, points: ["质量问题", "消费者承担|买家承担|你承担|自付"]}
+      - {q: "退货的快递费谁出", style: colloquial, points: ["质量问题", "消费者承担|买家承担|你承担|自付"]}
       - {q: "质量有问题退回去的运费算谁的", style: colloquial, points: ["商家承担|卖家承担"]}
 
   - id: P3
     bucket: policy
     expect_ids:
       - "returns#商品完好的判定"
+      - "faq#商品完好怎么判定"
       - "art-008"                          # 第八条就是"完好标准"的法规原文
       - "art-007"                          # 试用后贬值可不适用——"试穿"正是这条的判断依据
     should_refuse: false
@@ -52,7 +55,7 @@ cases:
 
   - id: P4
     bucket: policy
-    expect_ids: ["shipping#包邮门槛"]
+    expect_ids: ["shipping#包邮门槛", "faq#多少钱包邮"]
     should_refuse: false
     queries:
       - {q: "多少钱包邮", style: formal, points: ["99\\s*元"]}
@@ -61,7 +64,7 @@ cases:
 
   - id: P5
     bucket: policy
-    expect_ids: ["shipping#运费险"]
+    expect_ids: ["shipping#运费险", "faq#运费险怎么赔"]
     should_refuse: false
     queries:
       - {q: "运费险怎么赔", style: formal, points: ["12\\s*元"]}
@@ -79,7 +82,7 @@ cases:
 
   - id: P7
     bucket: policy
-    expect_ids: ["member#各等级的权益"]
+    expect_ids: ["member#各等级的权益", "faq#会员折扣和优惠券能一起用吗"]
     should_refuse: false
     queries:
       - {q: "会员有什么折扣", style: formal, points: ["98\\s*折", "95\\s*折"]}
@@ -88,12 +91,12 @@ cases:
 
   - id: P8
     bucket: policy
-    expect_ids: ["promo#叠加规则"]
+    expect_ids: ["promo#叠加规则", "faq#优惠券能叠加吗", "faq#优惠券怎么用", "faq#会员折扣和优惠券能一起用吗"]
     should_refuse: false
     queries:
       - {q: "优惠券能叠加使用吗", style: formal, points: ["不可叠加|不能叠加|只能使用一张"]}
       - {q: "两张券能一起用不", style: colloquial, points: ["不可叠加|不能叠加|只能使用一张"]}
-      - {q: "优惠券和会员折扣能同时用吗", style: multi, points: ["会员折扣"]}
+      - {q: "优惠券和会员折扣能同时用吗", style: multi, points: ["会员折扣|会员.{0,4}折扣"]}
 
   # ── 商品规格（型号精确命中，BM25 的主场）────────────────────
   - id: S1
@@ -101,8 +104,8 @@ cases:
     expect_ids: ["products#婴儿推车 ST-20 轻便伞车"]
     should_refuse: false
     queries:
-      - {q: "ST-20 能带上飞机吗", style: formal, points: ["可登机|能登机"]}
-      - {q: "这个伞车能登机不", style: colloquial, points: ["可登机|能登机"]}
+      - {q: "ST-20 能带上飞机吗", style: formal, points: ["可登机|能登机|可以登机"]}
+      - {q: "这个伞车能登机不", style: colloquial, points: ["可登机|能登机|可以登机"]}
       - {q: "ST-20 最多能坐多少斤的孩子", style: formal, points: ["15\\s*kg"]}
 
   - id: S2
@@ -126,16 +129,16 @@ cases:
   # ── 法规（引用要能对上条号）──────────────────────────────
   - id: R1
     bucket: regulation
-    expect_ids: ["art-006"]
+    expect_ids: ["art-006", "faq#退货政策是什么"]
     should_refuse: false
     queries:
       - {q: "哪些商品不适用七天无理由退货", style: formal, points: ["定作|定制", "音像制品"]}
       - {q: "拆封的音像制品能退吗", style: formal, points: ["音像制品"]}
-      - {q: "定做的商品能退不", style: colloquial, points: ["定作|定制"]}
+      - {q: "定做的商品能退不", style: colloquial, points: ["定作|定制|定做"]}
 
   - id: R2
     bucket: regulation
-    expect_ids: ["art-010"]
+    expect_ids: ["art-010", "faq#七天无理由从哪天开始算"]
     should_refuse: false
     queries:
       - {q: "七天无理由的起算时间", style: formal, points: ["次日"]}

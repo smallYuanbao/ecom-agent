@@ -16,10 +16,11 @@ DOC_SOURCES = {
     "member.md",
     "promo.md",
     "products.md",
+    "faq.md",
 }
 
 
-def test_all_six_docs_are_loaded():
+def test_all_docs_are_loaded():
     sources = {c["source"] for c in load_chunks() if c["kind"] == "doc"}
     assert sources == DOC_SOURCES
 

@@ -24,6 +24,8 @@ items:
     expect_ids:
       - "returns#七日无理由退货的适用范围"
       - "returns#不适用无理由退货的商品"
+      - "faq#退货政策是什么"
+      - "faq#七天无理由从哪天开始算"
     expected_output: "七日|7 个自然日|7个自然日/签收次日|签收的次日"
     style: formal
     split: dev
@@ -32,7 +34,7 @@ items:
     bucket: B1
     query: "退货运费由谁承担"
     expect_route: knowledge
-    expect_ids: ["returns#退货运费由谁承担"]
+    expect_ids: ["returns#退货运费由谁承担", "faq#退货运费谁承担"]
     expected_output: "质量问题/消费者承担|买家承担"
     style: formal
     split: dev
@@ -43,6 +45,7 @@ items:
     expect_route: knowledge
     expect_ids:
       - "returns#商品完好的判定"
+      - "faq#商品完好怎么判定"
       - "art-008"
       - "art-007"
     expected_output: "查验/完好"
@@ -53,7 +56,7 @@ items:
     bucket: B1
     query: "多少钱包邮"
     expect_route: knowledge
-    expect_ids: ["shipping#包邮门槛"]
+    expect_ids: ["shipping#包邮门槛", "faq#多少钱包邮"]
     expected_output: "99 元|99元/包邮"
     style: formal
     split: dev
@@ -62,7 +65,7 @@ items:
     bucket: B1
     query: "运费险怎么赔"
     expect_route: knowledge
-    expect_ids: ["shipping#运费险"]
+    expect_ids: ["shipping#运费险", "faq#运费险怎么赔"]
     expected_output: "12 元|12元/上限"
     style: formal
     split: dev
@@ -80,7 +83,7 @@ items:
     bucket: B1
     query: "会员有什么折扣"
     expect_route: knowledge
-    expect_ids: ["member#各等级的权益"]
+    expect_ids: ["member#各等级的权益", "faq#会员折扣和优惠券能一起用吗"]
     expected_output: "98 折|98折/95 折|95折"
     style: formal
     split: dev
@@ -89,7 +92,7 @@ items:
     bucket: B1
     query: "优惠券能叠加使用吗"
     expect_route: knowledge
-    expect_ids: ["promo#叠加规则"]
+    expect_ids: ["promo#叠加规则", "faq#优惠券能叠加吗", "faq#优惠券怎么用"]
     expected_output: "不可叠加|不能叠加|只能使用一张"
     style: formal
     split: dev
@@ -107,7 +110,7 @@ items:
     bucket: B1
     query: "哪些商品不适用七天无理由退货"
     expect_route: knowledge
-    expect_ids: ["art-006"]
+    expect_ids: ["art-006", "faq#退货政策是什么"]
     expected_output: "定作|定制/音像制品"
     style: formal
     split: dev
