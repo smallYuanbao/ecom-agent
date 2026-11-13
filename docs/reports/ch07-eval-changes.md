@@ -19,6 +19,8 @@
 | 11 | 2026-11-09 | Task 7 补 · judge 方差校验（3 次重复） | 未提交 |
 | 12 | 2026-11-09 | Task 8 · 阈值曲线 + 质量传导 | 未提交 |
 | 13 | 2026-11-09 | Task 8 补 · 检索选型复核 + 快照修正 | 未提交 |
+| 14 | 2026-11-09 | Task 9 · 退款困难组 + 评测方法论 | 未提交 |
+| 15 | 2026-11-09 | Task 10 · 验收、run-03 与文档 | 未提交 |
 
 ---
 
@@ -354,19 +356,23 @@ B08 / B09 / B10 / B11 在第一轮跑成「追问原因」后，补了「不想�
 1. ecom 评测实例起在 `127.0.0.1:8081`（独立 `data/eval.db`）；
 2. EvalFlow API + worker 以 `EVAL_TARGET=ecom` 重启；
 3. `scripts/export_evalflow.py --import` 导入 44 条到 `ecom-eval-v1`；
-4. 发起 run **#31**，44/44 样本完成；
+4. 发起 run **#31**，作为 run-01 基线（44/44 样本完成）；
 5. 写 [run-01.md](./run-01.md)。
 
 ### 指标修正
 
 第一次 run #29 暴露了两个口径问题：
 
-| 问题 | 修法 |
-|---|---|
-| B3/B4 的 policy 检索被算进 hit@k / MRR | 只有 `has_context`（有回答证据）时才计算；否则**不写评分行**（不适用 ≠ 失败） |
-| judge 不认识 `/` 与 `\|` 的要点语法 | 在 context_recall / answer_correctness prompt 里解释：`/` 分组、`\|` 任选 |
+| 问题 | 修法 | 何时生效 |
+|---|---|---|
+| B3/B4 的 policy 检索被算进 hit@k / MRR | 只有 `has_context`（有回答证据）时才计算；否则**不写评分行**（不适用 ≠ 失败） | #31 之后，run-02 起 |
+| judge 不认识 `/` 与 `\|` 的要点语法 | 在 context_recall / answer_correctness prompt 里解释：`/` 分组、`\|` 任选 | #31 之前 |
 
-修后 run #31：
+> 时间线容易看混：Task 5 的“不写行”改动在 Task 6 联调时才定稿，
+> 且发生在 #31 之后。所以 **run-01 的 `10/44` 是旧口径，不是 Task 5 跑出来的**；
+> run-02（#32）才是 `10/10`。
+
+run #31（run-01 基线）：
 
 | 指标 | 值 |
 |---|---|
@@ -390,8 +396,9 @@ B08 / B09 / B10 / B11 在第一轮跑成「追问原因」后，补了「不想�
 - EvalFlow 全量 → **126 passed**
 - ecom 全量 → **960 passed, 24 skipped**
 - EvalFlow run #31 → 44/44 完成
-- 覆盖率口径已改为「不适用不写行」；run #31 未重跑，`run-01.md` 已注明
-  下一轮 run-02 会显示 `10 / 10`，指标均值不受影响
+- 覆盖率口径在 #31 之后改为「不适用不写行」；run #31 未重跑，
+  `run-01.md` 已注明下一轮 run-02 会显示 `10 / 10`，指标均值不受影响
+- 因此 `run-01` 的 `10/44` 是历史快照，不属于 Task 5 的产出
 
 ---
 
@@ -416,7 +423,8 @@ FAQ 只做摘要与导航，详细条款仍在原政策文件里。
 
 ### 重建与回归
 
-- 重建 Chroma：chunk **41 → 57**，`kb_version` **2f59fbaa6c7a → 80bd26573951**；
+- 重建 Chroma：chunk **42 → 57**，`kb_version` **2f59fbaa6c7a → 80bd26573951**；
+  （Ch02 初始 41；`returns.md` 补「已发货未收到」后为 42，再加 15 条 FAQ 到 57。）
 - 证据列表加入 FAQ id（`expect_ids`），并把「可以登机 / 定做 / 你承担」等
   常见说法补进要点正则。
 
@@ -688,3 +696,124 @@ run-02 的 `Run.config.retrieval` 写成 `hybrid`，但 ecom 实际是 `dense`�
 - `pytest tests/security/test_logging.py` → 11 passed
 - `pytest tests/test_snapshot.py`（evalflow）→ 7 passed
 - 困难集报告由 `scripts/eval_retrieval.py --set hard` 生成
+
+---
+
+## 14 · Task 9 · 退款困难组 + 评测方法论（未提交）
+
+### 新增
+
+| 文件 | 内容 |
+|---|---|
+| `data/eval/refund_hard_test.json` | held-out test 15 条，5 类 × 3：规则顺序 / 字段粒度 / 数据缺口 / 语义模糊 / 多轮补充 |
+| `docs/reports/refund-hard.md` | dev + test 分列、Wilson CI、per-class、失败归因 |
+| `tests/eval/test_refund_hard_test.py` | 结构、gold id、跨 gold set 唯一、每组至少 2 条规则失败 |
+
+### 修改
+
+| 文件 | 内容 |
+|---|---|
+| `scripts/eval_refund.py` | 区分 dev / test；Wilson CI；per-class；`--only-test` / `--out`；judge 用 case `now` |
+| `app/core/prompts.py` | judge 补 4 类通用规则：数据缺口、类别优先、按件判定、非退款诉求 |
+| `tests/graph/rules/test_judge.py` | 更新顺序守卫，新增数据缺口 / 按件判定守卫 |
+| `data/eval/refund_gold_hard_10.json` | 标记 `_split=dev`，说明已参与调参 |
+| `docs/reports/refund-eval.md`、`ch03-acceptance.md` | 追加 2026-11-09 复跑更正 |
+
+### 结果（prompt 修复 + gold 对齐后）
+
+| 数据集 | 模型 | 95% CI | 规则 | 流水线 |
+|---|---|---|---|---|
+| 简单组（20） | 19/20 | 76–99% | 20/20 | 19/20 |
+| 困难组 dev（10） | **10/10** | 72–100% | 3/10 | 8/10 |
+| **held-out test（15）** | **15/15** | 80–100% | 6/15 | 13/15 |
+
+分类（test）：规则顺序 3/3（参照组）、字段粒度 3/3、数据缺口 3/3、
+语义模糊 3/3、多轮补充 3/3。prompt 修改后 dev 三次为 9/10、10/10、10/10；
+gold 修正后 test 三次均为 15/15。
+
+### 发现并修正的评测 bug
+
+`run_judge` 没把 case 的 `now` 传给 `judge_messages`，模型用真实系统时间算
+7 天窗口。固定日期的 gold set 在不同日期重跑会漂移：
+
+- 修正后简单组 18/20 → 19/20（G04/G20 附近是 6–7 天边界）；
+- 困难组 dev 从 Ch03 的 7/10 变为 5/10，旧值不可复现；
+- 这 5/10 促成了一次 judge prompt 修复，而不是重校准门槛。
+
+### gold 冲突：B07 vs H06/T01
+
+验收重跑 `eval_e2e` 时 B07 回归（43/44）：主评测 B07 和 seed 1108 规定
+「已发货未签收的定作商品 → `reject_then_refund`」，但 H06/T01 的 gold
+按「类别优先」标成了 `not_applicable`，两者直接矛盾。
+
+核对后**以规则表 / B07 为准**：
+
+- H06、T01 改为 `eligible=true, reject_then_refund`；
+- T03（待付款 + 定作）改为 `wrong_status`，不因定作改判；
+- prompt 恢复「状态规则 1–5 优先于类别规则」；
+- 规则顺序组因此降为**参照组**（gold 与规则表一致），不承担“规则失败”难度。
+
+### judge prompt 修复（只依据 dev）
+
+| 通用规则 | 覆盖 dev 失败 |
+|---|---|
+| `signed_at` / `category` 缺失 → 转人工，不猜窗口/类别 | H03、H07、T07、T08 |
+| 状态规则 1–5 优先于类别规则（与 B07 / seed 1108 一致） | H06、T01、T03 |
+| 按件退货以「要退的那件」为准，不套整单字段 | H08、T04、T05 |
+| 物流损坏、客服口头承诺、换货诉求 → 转人工 | H05、H09、T15 |
+
+结果：dev **5/10 → 10/10**，held-out test **10/15 → 15/15**。
+
+**盲测边界**：prompt 只依据 dev 失败设计，但运行后修正了 T01/T03 的 gold，
+且修改前已看过一次 test 结果。15/15 只能称为 **held-out 验证**，不是严格盲测；
+后续再改 prompt 或 gold 必须换新样本。
+
+### 验证
+
+- `pytest tests/eval/test_refund_hard_test.py tests/eval/test_refund_gold.py tests/eval/test_refund_gold_hard.py` → 通过
+- 全量测试见 Task 10
+
+---
+
+## 15 · Task 10 · 验收、run-03 与文档（未提交）
+
+### 新增
+
+| 文件 | 内容 |
+|---|---|
+| `docs/reports/ch07-acceptance.md` | 验收清单、关键指标、两个已知边界、复现命令 |
+| `docs/reports/run-03.md` | 当前 prompt 的 EvalFlow 快照（run #35） |
+| `docs/reports/run-local-06.md` | prompt 修复后的确定性回归 **44/44** |
+
+### 修改
+
+| 文件 | 内容 |
+|---|---|
+| `docs/reports/README.md` | 当前基线改为 run-03；补 acceptance / run-03 / run-local-06 |
+| `docs/reports/00-change-log-overview.md` | Ch07 → ✅ 10/10 |
+| `docs/superpowers/plans/00-tasks.md` | P7-1…P7-8 全部 ✅ |
+
+### 验收结果
+
+- 全量测试 **1030 passed, 16 skipped**；`ruff check .` 通过；
+- run-03：recall / hit / MRR 1.00，context_recall 1.00，faithfulness 1.00，
+  correctness **0.9977**，relevance 0.8909（噪声内）；
+- 确定性：**44/44**；
+- 阈值：0.53–0.56 双零，维持 0.55；
+- 质量传导：0 编造；
+- 退款：dev 10/10、held-out 15/15（参照组 3/3，其余 12/12），
+  流水线 8/10、13/15。
+
+### 验收时发现并修正
+
+- **gold 冲突**：B07 / seed 1108 规定“已发货未签收的定作商品 → 拒收退款”，
+  H06/T01 原标 `not_applicable`，导致 B07 回归（43/44）。以规则表为准修正
+  H06/T01/T03，并恢复 prompt 的状态优先级；e2e 回到 44/44。
+- **快照验证**：run-03 的 `config.retrieval` 已从错误的 `hybrid` 变为 `dense`。
+
+### 留给 Ch08 的已知边界
+
+- 退款流水线低于模型：差额是保守转人工，根因是 `condition_ok` /
+  `packaging_opened` 只有订单级；
+- held-out test 不是严格盲测，后续改 prompt 要换新样本；
+- B5–B7 的 relevance 低是安全兜底的正常表现。

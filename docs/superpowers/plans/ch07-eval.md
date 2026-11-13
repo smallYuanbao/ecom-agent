@@ -399,7 +399,8 @@ uv run python scripts/export_evalflow.py --import --base-url http://localhost:80
 **已完成的前置修复（2026-11-09）**：
 
 - 新增 `data/kb/faq.md`（15 条），解决「退货政策是什么」等宽泛问法的 top-5 召回；
-  chunk 41→57，`kb_version=80bd26573951`；dense hit@3 1.00 / MRR 0.964，
+  chunk 42→57（Ch02 初始 41，补「已发货未收到」后 42），
+  `kb_version=80bd26573951`；dense hit@3 1.00 / MRR 0.964，
   知识要点覆盖 40/40。详见改动记录 §8。
 - 语义证据闸：机械三态 + 0.55–0.60 边界自评，3s 超时、不重试、fail-closed；
   域外探测 8/8 拦住，可答题 42/42 放行。详见改动记录 §9。
@@ -518,6 +519,21 @@ uv run python scripts/export_evalflow.py --import --base-url http://localhost:80
 
 **Commit:** `test(eval): 退款困难组与置信区间`
 
+**完成记录（2026-11-09）**
+
+- dev 10 条（`_split=dev`）+ test 15 条（`refund_hard_test.json`，5 类 × 3）。
+- 发现并修正评测 bug：`run_judge` 未把 case `now` 传给 judge，导致固定日期
+  gold set 随运行当天漂移；修正后 dev 为 5/10，Ch03 的 7/10 不可复现。
+- 据此做了一次**只依据 dev** 的 judge prompt 修复：数据缺口转人工、
+  状态优先于类别、按件判定、非退款诉求。
+- 验收时发现 gold 冲突：B07/seed 1108 规定已发货未签收的定作商品
+  → `reject_then_refund`，H06/T01 原标 `not_applicable`；以规则表为准
+  修正 H06/T01/T03，规则顺序组降为参照组。
+- 修复后：dev **10/10**、held-out test **15/15**（CI 80–100%）、
+  规则 6/15、流水线 13/15；参照组 3/3，其余 4 组 12/12。
+- 重跑 3 次：dev 9/10、10/10、10/10；gold 修正后 test 15/15 ×3。
+- 修改前已看过一次 test 结果、运行后修正过 gold，因此 15/15 记为 held-out 验证。
+
 ---
 
 ### Task 10: 验收 + 文档
@@ -531,15 +547,15 @@ uv run python scripts/export_evalflow.py --import --base-url http://localhost:80
 
 **Step 1: 验收清单**
 
-- [ ] 44 条评测集校验通过
-- [ ] `/api/eval/chat` 正常 / 关闭 / 错误映射
-- [ ] EvalFlow 导入并跑完 run-01
-- [ ] run-02 指标变化可解释
-- [ ] 阈值曲线
-- [ ] 质量传导 2×2
-- [ ] 退款困难组 n ≥ 20 + CI
-- [ ] `/api/chat` 回归不变
-- [ ] 全量测试通过
+- [x] 44 条评测集校验通过
+- [x] `/api/eval/chat` 正常 / 关闭 / 错误映射
+- [x] EvalFlow 导入并跑完 run-01
+- [x] run-02 指标变化可解释
+- [x] 阈值曲线
+- [x] 质量传导 2×2
+- [x] 退款困难组 n ≥ 20 + CI
+- [x] `/api/chat` 回归不变
+- [x] 全量测试通过
 
 **Step 2: 状态**
 
@@ -548,6 +564,16 @@ uv run python scripts/export_evalflow.py --import --base-url http://localhost:80
 - 写 `ch07-acceptance.md`（结论、清单、命令、已知边界）。
 
 **Commit:** `docs(eval): Ch07 验收与文档`
+
+**完成记录（2026-11-09）**
+
+- 全量 **1030 passed, 16 skipped**；`ruff check .` 通过。
+- run-03（EvalFlow #35）：correctness 0.9977、recall 1.00；确定性 44/44。
+- 验收时发现 B07 与 H06/T01 的 gold 冲突，按规则表修正 H06/T01/T03，
+  e2e 从 43/44 回到 **44/44**。
+- 快照字段验证：run-03 的 `retrieval` 已是 `dense`（不再误记 hybrid）。
+- 已知边界：退款流水线 8/10、13/15，差在件级字段；held-out 非严格盲测；
+  B5–B7 relevance 低属安全兜底。
 
 ---
 

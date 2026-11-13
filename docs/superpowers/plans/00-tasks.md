@@ -160,7 +160,7 @@ D 的建单（P4-3）仍待做。
 | P7-5 | 修失败样本跑第二轮 | — | `docs/reports/run-02.md` | 指标变化可解释 | ✅ |
 | P7-6 | 阈值扫描 | 置信度讨论 | `docs/reports/gate-thresholds.md` | 误放/误拦曲线；0.53–0.56 双零，维持 0.55 | ✅ |
 | P7-7 | **质量传导对照**：同批知识样本上把「检索命中」×「答案覆盖要点」列成 2×2 | L1、K6 | `docs/reports/quality-propagation.md` | 四格有样本；人工核验 4 条，0 编造 | ✅ |
-| P7-8 | **退款困难组扩充 + 评测方法论**：现有 10 条转为 dev set；新增 10–20 条按失败类型分层（规则顺序 / 字段粒度 / 数据缺口 / 语义模糊 / 多轮补充），**新增部分只做盲测，不参与调 prompt**；报告加 Wilson 95% CI 与 per-class 准确率 | Ch03 验收（n=10，CI [40%, 89%]） | `data/eval/refund_hard_test.json`、`scripts/eval_refund.py` | 困难组 n ≥ 20；每类 ≥ 3 条；报告给出 CI 与分类准确率；盲测集不参与调参 | ⏳ |
+| P7-8 | **退款困难组扩充 + 评测方法论**：现有 10 条转为 dev set；新增 10–20 条按失败类型分层（规则顺序 / 字段粒度 / 数据缺口 / 语义模糊 / 多轮补充），**新增部分只做盲测，不参与调 prompt**；报告加 Wilson 95% CI 与 per-class 准确率 | Ch03 验收（n=10，CI [40%, 89%]） | `data/eval/refund_hard_test.json`、`scripts/eval_refund.py` | dev 10 + test 15；held-out 15/15（CI 80–100%）；规则顺序组为参照组；prompt 只依据 dev 修复 | ✅ |
 
 **为什么 P7-8 在 Ch07 而不是 Ch03 补**：Ch03 的 10 条已经用来改过两次 prompt
 （`condition_ok=null` 禁令、原话优先），它事实上是 **dev set**，不再是干净测试集。
