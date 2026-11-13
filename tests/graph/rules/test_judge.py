@@ -205,11 +205,30 @@ def test_prompt_forbids_not_intact_when_condition_unknown():
 
 
 def test_prompt_pins_window_and_status_order():
-    """run-local-02 的三条失败：模型把「完好」当成 7 天窗口的豁免，
-    并把「已发货」的定制商品跳到类别规则。用例子把顺序写死。"""
+    """顺序是业务约定，必须写死：
+
+    - 「完好」不能抵消 7 天窗口；
+    - 状态规则 1–5 优先于类别规则（已发货未签收 + 定作 → reject_then_refund）；
+    - 已签收的定作商品 → not_applicable；
+    - 类别规则先于窗口和完好规则。
+    """
     assert "不能抵消 7 天窗口" in JUDGE_SYSTEM
-    assert "状态规则优先于类别规则" in JUDGE_SYSTEM
+    assert "状态规则 1–5 优先于类别规则" in JUDGE_SYSTEM
     assert "类别规则先于窗口和完好规则" in JUDGE_SYSTEM
+    assert "不要因为商品是定作就改判 `not_applicable`" in JUDGE_SYSTEM
+
+
+def test_prompt_requires_human_when_data_is_missing():
+    """缺字段时不能补默认结论：窗口无法算、类别未知都要转人工。"""
+    assert "`order.signed_at` 为空" in JUDGE_SYSTEM
+    assert "`order.category` 为空" in JUDGE_SYSTEM
+    assert "不要猜" in JUDGE_SYSTEM
+
+
+def test_prompt_handles_partial_item_returns():
+    """按件退货时，整单的 condition_ok / packaging_opened 不能直接套到退货件。"""
+    assert "`request.item_count < order.quantity`" in JUDGE_SYSTEM
+    assert "要退的那件" in JUDGE_SYSTEM
 
 
 # ── 条件边 ──────────────────────────────────────────────────

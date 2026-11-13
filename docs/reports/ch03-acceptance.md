@@ -102,3 +102,13 @@ uv run python scripts/eval_refund.py
 uv run python scripts/eval_refund.py --skip-model   # 只跑金额
 uv run python scripts/try.py graph "订单1002 不想要了"
 ```
+
+---
+
+> **2026-11-09 复跑更正**：评测脚本此前未把案例的 `now` 传给 judge，7 天窗口
+> 依赖真实系统时间，固定日期的 gold set 重跑会漂移。修正后困难组 dev 先为
+> **5/10**（简单组 18/20），旧的 7/10 不可复现；据此做了一次只依据 dev 的
+> judge prompt 修复，dev 回到 **10/10**。新的 held-out test 为 15/15
+> （规则顺序组为参照组）。详见
+> [refund-hard.md](./refund-hard.md)。本报告其余结论（金额、规则否决机制、
+> 延迟）不受影响。

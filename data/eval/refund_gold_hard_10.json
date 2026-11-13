@@ -1,5 +1,6 @@
 {
-  "_comment": "困难组：规则表判不了、或规则表会判错的案例。用途是证明模型判定的增量价值——这 10 条如果规则也能全对，说明 gold set 选错了。expected 仍由人工填写：{eligible: bool, reason_code: str} 或 {needs_human: true}。标注标准见 docs/design/电商客服-退款评测标注规则.md",
+  "_comment": "困难组 dev：规则表判不了、或规则表会判错的案例。这 10 条已参与过 prompt / 规则调整，不能当盲测；blind test 见 refund_hard_test.json。expected 仍由人工填写：{eligible: bool, reason_code: str} 或 {needs_human: true}。标注标准见 docs/design/电商客服-退款评测标注规则.md",
+  "_split": "dev",
   "_now": "2026-11-05T10:00:00",
   "_groups": {
     "A": "规则返回 None（判不了），H01–H04",
@@ -177,10 +178,10 @@
       },
       "now": "2026-11-05T10:00:00",
       "query": "刻了宝宝名字的推车还没收到，不想要了",
-      "note": "规则：已发货未签收命中规则 5 → reject_then_refund（可退）。但定作商品法定不适用七日无理由，规则 5 排在类别规则之前，是 app/rules/eligibility.py 注释里已标注的未覆盖组合。",
+      "note": "已发货未签收命中规则 5 → reject_then_refund；状态规则 1–5 优先于类别规则（与主评测 B07 / seed 1108 一致）。",
       "expected": {
-        "eligible": false,
-        "reason_code": "not_applicable"
+        "eligible": true,
+        "reason_code": "reject_then_refund"
       }
     },
     {
